@@ -19,7 +19,7 @@ trait UserRestAPI {
   def report(ipAddress: String): Future[Unit]
 
   @GET
-  def listUsers: Future[Map[String, LocationInfo]]
+  def listUsers: Future[Seq[(String, LocationInfo)]]
 }
 
 object UserRestAPI extends RestApiCompanion[EnhancedRestImplicits,UserRestAPI](EnhancedRestImplicits)

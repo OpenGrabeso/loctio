@@ -19,13 +19,13 @@ object Presence {
   }
 
   def locationFromIpAddress(ipAddress: String): String = {
-    ipAddress
+    ipAddress.trim
   }
 
-  def listUsers: Map[String, LocationInfo] = {
+  def listUsers: Seq[(String, LocationInfo)] = {
     val items = enumerate("presence")
     items.map(i => i._2 -> load[PresenceInfo](i._1)).flatMap { case (login, data) =>
-      data.map(d => login -> LocationInfo(locationFromIpAddress(d.ipAddress), d.lastSeen))
+      data.map(d => login -> LocationInfo(locationFromIpAddress(d.ipAddress), d.lastSeen.toString))
     }
-  }.toMap
+  }.toSeq
 }

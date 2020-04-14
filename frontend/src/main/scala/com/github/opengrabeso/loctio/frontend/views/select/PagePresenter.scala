@@ -8,6 +8,7 @@ import routing._
 import io.udash._
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.util.{Failure, Success}
 
 /** Contains the business logic of this view. */
 class PagePresenter(
@@ -21,13 +22,27 @@ class PagePresenter(
   def init(): Unit = {
     // load the settings before installing the handler
     // otherwise both handlers are called, which makes things confusing
+    props.listen { p =>
+      loadUsers(p.token)
+    }
     props.set(SettingsModel.load)
   }
 
-  def loadUsers() = {
+  def loadUsers(token: String) = {
     model.subProp(_.loading).set(true)
     model.subProp(_.users).set(Nil)
-    // TODO: real loading
+
+    userService.rpc.user(token).listUsers.onComplete {
+      case Success(value) =>
+        model.subProp(_.users).set(value.toSeq.map { u =>
+          UserRow(u._1, u._2.location, u._2.lastSeen)
+        })
+        model.subProp(_.loading).set(false)
+      case Failure(exception) =>
+        model.subProp(_.error).set(Some(exception))
+        model.subProp(_.loading).set(false)
+    }
+
   }
 
   override def handleState(state: SelectPageState.type): Unit = {}

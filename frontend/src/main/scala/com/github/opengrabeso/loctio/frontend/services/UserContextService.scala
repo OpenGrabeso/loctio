@@ -13,11 +13,10 @@ object UserContextService {
   case class UserContextData(userId: String, token: String)
 }
 
-class UserContextService(rpc: rest.RestAPI)(implicit ec: ExecutionContext) {
+class UserContextService(val rpc: rest.RestAPI)(implicit ec: ExecutionContext) {
 
   val properties = ModelProperty(dataModel.SettingsModel())
   var userData: Promise[UserContextData] = _
-
 
   private val publicIpAddress = Promise[String]()
 
@@ -32,7 +31,7 @@ class UserContextService(rpc: rest.RestAPI)(implicit ec: ExecutionContext) {
         r.body match {
           case Right(string) =>
             println(s"Obtained a public IP address $string")
-            publicIpAddress.success(string)
+            publicIpAddress.success(string.trim)
           case Left(value) =>
             publicIpAddress.failure(new UnsupportedOperationException(value))
         }

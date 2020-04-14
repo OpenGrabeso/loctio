@@ -25,7 +25,7 @@ class PageView(
     val attribs = Seq[DisplayAttrib](
       TableFactory.TableAttrib("User", (ar, _, _) => ar.login.render),
       TableFactory.TableAttrib("Location", (ar, _, _) => ar.location.render),
-      TableFactory.TableAttrib("Last seen", (ar, _, _) => ar.lastTime.map(t => formatDateTime(t.toJSDate)).getOrElse("N/A").render),
+      TableFactory.TableAttrib("Last seen", (ar, _, _) => ar.lastTime.render),
     )
 
     val table = UdashTable(model.subSeq(_.users), striped = true.toProperty, bordered = true.toProperty, hover = true.toProperty, small = true.toProperty)(
@@ -39,7 +39,7 @@ class PageView(
         showIfElse(model.subProp(_.loading))(
           p("Loading...").render,
           div(
-            bind(model.subProp(_.error).transform(_.map(ex => p(s"Error loading activities ${ex.toString}")).orNull)),
+            bind(model.subProp(_.error).transform(_.map(ex => s"Error loading activities ${ex.toString}").orNull)),
             table.render
           ).render
         )
