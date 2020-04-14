@@ -17,8 +17,10 @@ class PageViewFactory(
     val model = ModelProperty(PageModel(loading = true))
 
     val presenter = new PagePresenter(model, application, userService)
-    presenter.loadUsers()
     val view = new PageView(model, presenter, userService.properties)
+
+    presenter.init()
+
     (view, presenter)
   }
 }

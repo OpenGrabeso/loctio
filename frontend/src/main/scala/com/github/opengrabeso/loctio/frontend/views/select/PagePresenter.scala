@@ -3,6 +3,7 @@ package frontend
 package views
 package select
 
+import com.github.opengrabeso.loctio.dataModel.SettingsModel
 import routing._
 import io.udash._
 
@@ -14,6 +15,14 @@ class PagePresenter(
   application: Application[RoutingState],
   userService: services.UserContextService
 )(implicit ec: ExecutionContext) extends Presenter[SelectPageState.type] {
+
+  def props: ModelProperty[SettingsModel] = userService.properties
+
+  def init(): Unit = {
+    // load the settings before installing the handler
+    // otherwise both handlers are called, which makes things confusing
+    props.set(SettingsModel.load)
+  }
 
   def loadUsers() = {
     model.subProp(_.loading).set(true)
