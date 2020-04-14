@@ -22,13 +22,9 @@ object Storage extends FileStore {
 
   // full name combined - namespace, filename, user Id
   object FullName {
-    def apply(namespace: String, filename: String, userId: String): FullName = {
+    def apply(namespace: String, filename: String): FullName = {
       // user id needed so that files from different users are not conflicting
-      FullName(userId + "/" + namespace + "/" + filename)
-    }
-    def withMetadata(namespace: String, filename: String, userId: String, metadata: Seq[(String, String)]): FullName = {
-      // metadata stored as part of the filename are much quicker to access, filtering is done from them only
-      FullName(userId + "/" + namespace + "/" + filename + metadataEncoded(metadata))
+      FullName(namespace + "/" + filename)
     }
   }
 
@@ -36,28 +32,7 @@ object Storage extends FileStore {
 
   private def fileId(filename: String) = BlobId.of(bucket, filename)
 
-  private def userFilename(namespace: String, filename: String, userId: String) = FullName.apply(namespace, filename, userId)
-
-  def metadataEncoded(metadata: Seq[(String, String)]): String = {
-    if (metadata.nonEmpty) {
-      metadata.flatMap(kv => Seq(kv._1, kv._2)).map(URLEncoder.encode(_, "UTF-8")).mkString("//","/","")
-    } else {
-      ""
-    }
-  }
-
-  def metadataFromFilename(filename: String): Map[String, String] = {
-    val split = filename.split("//")
-    if (split.size > 1) {
-      val md = split(1).split("/")
-      def decode(x: String) = URLDecoder.decode(x, "UTF-8")
-      md.grouped(2).map {
-        case Array(k, v) => decode(k) -> decode(v)
-      }.toMap
-    } else {
-      Map.empty
-    }
-  }
+  private def userFilename(namespace: String, filename: String) = FullName.apply(namespace, filename)
 
   val credentials = GoogleCredentials.getApplicationDefault
   val storage = StorageOptions.newBuilder().setCredentials(credentials).build().getService
@@ -90,8 +65,8 @@ object Storage extends FileStore {
     oos.close()
   }
 
-  def getFullName(stage: String, filename: String, userId: String): FullName = {
-    FullName(stage, filename, userId)
+  def getFullName(stage: String, filename: String): FullName = {
+    FullName(stage, filename)
   }
 
 
@@ -153,20 +128,13 @@ object Storage extends FileStore {
   }
 
 
-  def enumerate(namespace: String, userId: String, filter: Option[String => Boolean] = None): Iterable[(FullName, String)] = {
+  def enumerate(namespace: String, filter: Option[String => Boolean] = None): Iterable[(FullName, String)] = {
 
-    def filterByMetadata(name: String, filter: String => Boolean): Option[String] = {
-      // filtering can be done only by "priority" (filename) metadata, accessing real metadata is too slow and brings almost no benefit
-      Some(name).filter(filter)
-    }
-
-    val prefix = userFilename(namespace, "", userId)
+    val prefix = userFilename(namespace, "")
     val blobs = storage.list(bucket, BlobListOption.prefix(prefix.name))
     val list = blobs.iterateAll().asScala
-    val actStream = for {
-      iCandidate <- list
-      iName <- filter.map(f => filterByMetadata(iCandidate.getName, f)).getOrElse(Some(iCandidate.getName))
-    } yield {
+    val actStream = for (iCandidate <- list) yield {
+      val iName = iCandidate.getName
       assert(iName.startsWith(prefix.name))
       FullName(iName) -> iName.drop(prefix.name.length)
     }
@@ -184,8 +152,8 @@ object Storage extends FileStore {
     }
   }
 
-  def metadata(namespace: String, userId: String, path: String): Seq[(String, String)] = {
-    val prefix = userFilename(namespace, path, userId)
+  def metadata(namespace: String, path: String): Seq[(String, String)] = {
+    val prefix = userFilename(namespace, path)
     val blobs = storage.list(bucket, BlobListOption.prefix(prefix.name))
     val found = blobs.iterateAll().asScala
 
@@ -205,19 +173,9 @@ object Storage extends FileStore {
     }
   }
 
-  def metadataValue(namespace: String, userId: String, path: String, name: String): Option[String] = {
-    val md = metadata(namespace, userId, path)
+  def metadataValue(namespace: String, path: String, name: String): Option[String] = {
+    val md = metadata(namespace, path)
     md.find(_._1 == name).map(_._2)
-  }
-
-  def digest(namespace: String, userId: String, path: String): Option[String] = {
-    metadataValue(namespace, userId, path, "digest")
-  }
-
-  // return true when the digest is matching (i.e. file does not need to be updated)
-  def check(namespace: String, userId: String, path: String, digestToCompare: String): Boolean = {
-    val oldDigest = digest(namespace, userId, path)
-    oldDigest.contains(digestToCompare)
   }
 
   def updateMetadata(file: String, metadata: Seq[(String, String)]): Boolean = {

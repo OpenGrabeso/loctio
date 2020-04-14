@@ -14,6 +14,12 @@ trait UserRestAPI {
 
   @GET
   def name: Future[(String, String)]
+
+  @PUT
+  def report(ipAddress: String): Future[Unit]
+
+  @GET
+  def listUsers: Future[Map[String, LocationInfo]]
 }
 
 object UserRestAPI extends RestApiCompanion[EnhancedRestImplicits,UserRestAPI](EnhancedRestImplicits)
