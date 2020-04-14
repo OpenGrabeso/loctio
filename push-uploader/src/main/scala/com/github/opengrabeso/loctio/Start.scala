@@ -19,6 +19,8 @@ object Start extends App {
   implicit val system = ActorSystem()
   implicit val materializer = ActorMaterializer()
 
+  val exitEvent = Promise[Boolean]()
+
   trait ServerUsed {
     def url: String
     def desciption: String
@@ -184,9 +186,13 @@ object Start extends App {
     }
 
     def remove(icon: TrayIcon): Unit = {
-      SwingUtilities.invokeAndWait(new Runnable {
-        override def run() = removeImpl(icon)
-      })
+      if (SwingUtilities.isEventDispatchThread) {
+        removeImpl(icon)
+      } else {
+        SwingUtilities.invokeAndWait(new Runnable {
+          override def run() = removeImpl(icon)
+        })
+      }
     }
 
     def loginDone(icon: TrayIcon): Unit = {
@@ -209,11 +215,8 @@ object Start extends App {
   }
 
   // wait until user ends the application
-  while (true) {
-    Thread.sleep(10000)
-  }
 
-  icon.foreach(Tray.loginDone)
+  Await.result(exitEvent.future, Duration.Inf)
 
   icon.foreach(Tray.remove)
   // force stop - some threads seem to be preventing this and I am unable to find why
