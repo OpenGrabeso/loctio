@@ -29,9 +29,11 @@ object Main extends common.Formatting {
   }
 
   def devMode: Boolean = {
-    val prop = new Properties()
-    prop.load(getClass.getResourceAsStream("/config.properties"))
-    prop.getProperty("devMode").toBoolean
+    Option(getClass.getResourceAsStream("/config.properties")).exists { is =>
+      val prop = new Properties()
+      prop.load(is)
+      prop.getProperty("devMode").toBoolean
+    }
   }
 
   case class GitHubAuthResult(token: String, login: String, fullName: String) {
