@@ -12,7 +12,6 @@ trait RestAPI {
   @GET
   def identity(@Path in: String): Future[String]
 
-  /* Caution: cookie parameters are used from the dom.document when called from Scala.js */
   def user(token: String): UserRestAPI
 
   @GET

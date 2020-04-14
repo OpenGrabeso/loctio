@@ -2,7 +2,7 @@ package com.github.opengrabeso.mixtio
 package frontend
 package views
 
-import com.github.opengrabeso.mixtio.rest.RestAPIClient
+import dataModel.SettingsModel
 import routing._
 import io.udash._
 import io.udash.bootstrap._
@@ -15,7 +15,7 @@ import scala.concurrent.ExecutionContext
 
 object Root {
 
-  case class PageModel(token: String = "", fullName: String = "", login: String = "")
+  case class PageModel(emptyModelNotAllowed: String = "")
 
   object PageModel extends HasModelPropertyCreator[PageModel]
 
@@ -26,35 +26,31 @@ object Root {
   )(implicit ec: ExecutionContext) extends Presenter[RootState.type] {
 
 
-    model.subProp(_.token).listen { t =>
-      login(t)
-    }
-
     override def handleState(state: RootState.type): Unit = {}
 
-    def login(token: String) = {
-      val userApi = RestAPIClient.api.user(token)
-      userApi.name.foreach { name =>
-        // TODO: receive fullName as well
-        model.subProp(_.login).set(name)
-        model.subProp(_.fullName).set(name)
-        userContextService.login(name, token)
-      }
-    }
+    def gotoMain(): Unit = application.goTo(SelectPageState)
 
-    def gotoMain() = {
-      application.goTo(SelectPageState)
-    }
+    def gotoSettings(): Unit = application.goTo(SettingsPageState)
+
   }
 
 
-  class View(model: ModelProperty[PageModel], presenter: PagePresenter) extends ContainerView with CssView {
+  class View(
+    model: ModelProperty[PageModel], presenter: PagePresenter,
+    globals: ModelProperty[SettingsModel]
+  ) extends ContainerView with CssView with views.PageUtils {
 
     import scalatags.JsDom.all._
 
+    private val settingsButton = button("Settings".toProperty)
+
+    buttonOnClick(settingsButton) {presenter.gotoSettings()}
+
+
+
     val header: Seq[HTMLElement] = {
-      val name = model.subProp(_.fullName)
-      val userId = model.subProp(_.login)
+      val name = globals.subProp(_.fullName)
+      val userId = globals.subProp(_.login)
 
       Seq(
         div(
@@ -63,6 +59,9 @@ object Root {
           table(
             tbody(
               tr(
+                td(
+                  settingsButton
+                ),
                 td(
                   table(
                     tbody(
@@ -137,7 +136,7 @@ object Root {
       val model = ModelProperty(PageModel())
       val presenter = new PagePresenter(model, userService, application)
 
-      val view = new View(model, presenter)
+      val view = new View(model, presenter, userService.properties)
       (view, presenter)
     }
   }

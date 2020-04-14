@@ -3,6 +3,7 @@ package frontend
 package views
 package select
 
+import com.github.opengrabeso.mixtio.dataModel.SettingsModel
 import common.css._
 import io.udash._
 import io.udash.bootstrap.table.UdashTable
@@ -12,10 +13,12 @@ import scalatags.JsDom.all._
 class PageView(
   model: ModelProperty[PageModel],
   presenter: PagePresenter,
+  globals: ModelProperty[SettingsModel]
 ) extends FinalView with CssView with PageUtils with TimeFormatting {
   val s = SelectPageStyles
 
   def getTemplate: Modifier = {
+
 
     // value is a callback
     type DisplayAttrib = TableFactory.TableAttrib[UserRow]

@@ -30,6 +30,15 @@ object SelectPageStyles extends CssBase {
     containerBorder,
   )
 
+  val settingsContainer = style(
+    display.flex,
+    flexDirection.column,
+    margin.auto,
+    containerBorder,
+    height(100 %%),
+  )
+
+
   val uploading: CssStyle = style(
     backgroundColor.lightblue
   )
