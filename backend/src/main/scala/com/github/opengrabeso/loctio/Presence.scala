@@ -1,6 +1,6 @@
 package com.github.opengrabeso.loctio
 
-import java.time.ZonedDateTime
+import java.time.{ZoneOffset, ZonedDateTime}
 
 import Storage._
 import common.model._
@@ -13,7 +13,7 @@ object Presence {
   ) extends Serializable
 
   def reportUser(login: String, ipAddress: String): Unit = {
-    val now = ZonedDateTime.now()
+    val now = ZonedDateTime.now().withZoneSameInstant(ZoneOffset.UTC)
     val info = PresenceInfo(ipAddress, now)
     store(FullName("presence", login), info)
   }
@@ -25,7 +25,7 @@ object Presence {
   def listUsers: Seq[(String, LocationInfo)] = {
     val items = enumerate("presence")
     items.map(i => i._2 -> load[PresenceInfo](i._1)).flatMap { case (login, data) =>
-      data.map(d => login -> LocationInfo(locationFromIpAddress(d.ipAddress), d.lastSeen.toString))
+      data.map(d => login -> LocationInfo(locationFromIpAddress(d.ipAddress), d.lastSeen.withZoneSameInstant(ZoneOffset.UTC).toString))
     }
   }.toSeq
 }

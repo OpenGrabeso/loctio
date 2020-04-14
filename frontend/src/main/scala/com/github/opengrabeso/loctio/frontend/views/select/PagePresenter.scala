@@ -4,6 +4,7 @@ package views
 package select
 
 import com.github.opengrabeso.loctio.dataModel.SettingsModel
+import java.time.ZonedDateTime
 import routing._
 import io.udash._
 
@@ -34,8 +35,9 @@ class PagePresenter(
 
     userService.rpc.user(token).listUsers.onComplete {
       case Success(value) =>
-        model.subProp(_.users).set(value.toSeq.map { u =>
-          UserRow(u._1, u._2.location, u._2.lastSeen)
+        model.subProp(_.users).set(value.map { u =>
+          println(s"parse ${u._2.lastSeen}")
+          UserRow(u._1, u._2.location, ZonedDateTime.parse(u._2.lastSeen))
         })
         model.subProp(_.loading).set(false)
       case Failure(exception) =>

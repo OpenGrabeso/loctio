@@ -25,7 +25,7 @@ class PageView(
     val attribs = Seq[DisplayAttrib](
       TableFactory.TableAttrib("User", (ar, _, _) => ar.login.render),
       TableFactory.TableAttrib("Location", (ar, _, _) => ar.location.render),
-      TableFactory.TableAttrib("Last seen", (ar, _, _) => ar.lastTime.render),
+      TableFactory.TableAttrib("Last seen", (ar, _, _) => formatDateTime(ar.lastTime.toJSDate).render),
     )
 
     val table = UdashTable(model.subSeq(_.users), striped = true.toProperty, bordered = true.toProperty, hover = true.toProperty, small = true.toProperty)(
