@@ -25,9 +25,9 @@ class UserContextService(rpc: rest.RestAPI)(implicit ec: ExecutionContext) {
     rpc.user(token).name.onComplete {
       case Success(r) =>
         println(s"Login - new user $r")
-        properties.subProp(_.login).set(r)
-        properties.subProp(_.fullName).set(r)
-        loginFor.success(new UserContextData(r, token))
+        properties.subProp(_.login).set(r._1)
+        properties.subProp(_.fullName).set(r._2)
+        loginFor.success(new UserContextData(r._1, token))
       case Failure(ex) =>
         loginFor.failure(ex)
     }

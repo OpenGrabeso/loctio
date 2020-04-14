@@ -13,7 +13,7 @@ import scala.concurrent.Future
 trait UserRestAPI {
 
   @GET
-  def name: Future[String]
+  def name: Future[(String, String)]
 }
 
 object UserRestAPI extends RestApiCompanion[EnhancedRestImplicits,UserRestAPI](EnhancedRestImplicits)
