@@ -25,7 +25,8 @@ object Presence {
   def listUsers: Seq[(String, LocationInfo)] = {
     val items = enumerate("presence")
     items.map(i => i._2 -> load[PresenceInfo](i._1)).flatMap { case (login, data) =>
-      data.map(d => login -> LocationInfo(locationFromIpAddress(d.ipAddress), d.lastSeen.withZoneSameInstant(ZoneOffset.UTC).toString))
+      // we need to transfer the time as UTC, otherwise the JS client is unable to decode it
+      data.map(d => login -> LocationInfo(locationFromIpAddress(d.ipAddress), d.lastSeen.withZoneSameInstant(ZoneOffset.UTC)))
     }
   }.toSeq
 }
