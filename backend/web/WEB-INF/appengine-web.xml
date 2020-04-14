@@ -4,7 +4,7 @@
   <version>1</version>
   <threadsafe>true</threadsafe>
   <sessions-enabled>true</sessions-enabled>
-  <instance-class>F2</instance-class>
+  <instance-class>F1</instance-class>
   <runtime>java8</runtime>
   <staging><enable-jar-classes>true</enable-jar-classes></staging>
 </appengine-web-app>
