@@ -18,7 +18,7 @@ object Storage extends FileStore {
 
   // from https://cloud.google.com/appengine/docs/standard/java/using-cloud-storage
 
-  final val bucket = "mixtio.appspot.com"
+  final val bucket = "loctio.appspot.com"
 
   // full name combined - namespace, filename, user Id
   object FullName {
@@ -90,48 +90,15 @@ object Storage extends FileStore {
     oos.close()
   }
 
-  def store(
-    namespace: String, filename: String, userId: String, obj1: AnyRef, obj2: AnyRef,
-    metadata: Seq[(String, String)] = Seq.empty, priorityMetaData: Seq[(String, String)] = Seq.empty
-  ) = {
-    println(s"store to $namespace: '$filename' - '$userId'")
-    val os = output(FullName.withMetadata(namespace, filename, userId, priorityMetaData), metadata)
-    val oos = new ObjectOutputStream(os)
-    oos.writeObject(obj1)
-    oos.writeObject(obj2)
-    oos.close()
-    os.close()
-  }
-
   def getFullName(stage: String, filename: String, userId: String): FullName = {
-    val prefix = FullName(stage, filename, userId)
-
-    val blobs = storage.list(bucket, BlobListOption.prefix(prefix.name))
-
-    val matches = for (iCandidate <- blobs.iterateAll().asScala) yield {
-      // do something with the blob
-      assert(iCandidate.getName.startsWith(prefix.name))
-      iCandidate.getName
-    }
-
-    // multiple matches possible, because of -1 .. -N variants added
-    // select only real matches
-    val realMatches = matches.toList.filter { name =>
-      name == prefix.name || name.startsWith(prefix.name + "//")
-    }
-
-    if (realMatches.size == 1) {
-      FullName(realMatches.head)
-    } else prefix
+    FullName(stage, filename, userId)
   }
 
 
-
-  private def readSingleObject[T: ClassTag](ois: ObjectInputStream) = {
+  private def readSingleObject[T: ClassTag](ois: ObjectInputStream): Option[T] = {
     try {
       val read = ois.readObject()
       read match {
-        case Main.NoActivity => None
         case r: T => Some(r)
         case null => None
         case any =>
@@ -178,26 +145,6 @@ object Storage extends FileStore {
       case x: Exception =>
         x.printStackTrace()
         None
-    }
-  }
-
-  def load2nd[T : ClassTag](fullName: FullName): Option[T] = {
-    //println(s"load '$filename' - '$userId'")
-    load[AnyRef, T](fullName).map(_._2)
-  }
-
-  def load[T1: ClassTag, T2: ClassTag](fullName: FullName): Option[(T1, T2)] = {
-    println(s"Load from '$fullName'")
-    val is = input(fullName)
-    try {
-      val ois = new ObjectInputStream(is)
-      val obj1 = readSingleObject[T1](ois)
-      obj1.flatMap { o1 =>
-        val obj2 = readSingleObject[T2](ois)
-        obj2.map(o2 => (o1, o2))
-      }.orElse(None)
-    } finally {
-      is.close()
     }
   }
 

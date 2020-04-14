@@ -1,6 +1,6 @@
 package com.github.opengrabeso
 
 package object mixtio {
-  val appName: String = "Mixtio"
-  val gitHubName: String = "Mixtio"
+  val appName: String = "Loctio"
+  val gitHubName: String = "Loctio"
 }

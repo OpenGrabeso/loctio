@@ -2,7 +2,6 @@ package com.github.opengrabeso.mixtio
 
 import java.time.temporal.ChronoUnit
 
-import Main._
 import java.time.{ZoneId, ZonedDateTime}
 
 trait FileStore {
@@ -10,22 +9,8 @@ trait FileStore {
 
   def maxAgeByName(name: String): Option[Int] = {
     val test = false
-    val maxSessionAge = if (test) 0 else 2
-    val maxAgeInDays = if (name.contains("/" + namespace.stage + "/")) {
-      Some(90)
-    } else if (name.contains("/" + namespace.settings + "/")) {
-      Some(365)
-    } else if (name.contains("/" + namespace.edit + "/")) {
-      Some(14)
-    } else if (name.contains("/" + namespace.uploadProgress + "/")) { // must be listed before namespace.upload, that would match more eagerly
-      Some(maxSessionAge)
-    } else if (name.contains("/" + namespace.uploadResult(""))) {
-      Some(maxSessionAge)
-    } else if (name.contains("/" + namespace.upload(""))) {
-      Some(maxSessionAge)
-    } else {
-      None
-    }
+    val maxSessionAge = if (test) 0 else 90
+    val maxAgeInDays = Some(maxSessionAge)
     maxAgeInDays
   }
 

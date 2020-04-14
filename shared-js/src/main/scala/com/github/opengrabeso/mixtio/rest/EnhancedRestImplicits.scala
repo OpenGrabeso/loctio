@@ -5,7 +5,6 @@ import java.time.ZonedDateTime
 
 import com.avsystem.commons.meta.MacroInstances
 import com.avsystem.commons.serialization.{GenCodec, GenKeyCodec, HasGenCodecWithDeps}
-import com.github.opengrabeso.mixtio.common.model.SportId
 import io.udash.rest._
 import io.udash.rest.openapi.{RestSchema, RestStructure}
 
@@ -14,20 +13,12 @@ trait EnhancedRestImplicits extends DefaultRestImplicits {
 
   implicit val zonedDateTimeCodec: GenCodec[ZonedDateTime] = GenCodec.fromApplyUnapplyProvider(ZonedDateTimeAU)
   implicit val zonedDateTimeKeyCodec: GenKeyCodec[ZonedDateTime] = GenKeyCodec.create(ZonedDateTime.parse,_.toString)
-
-  implicit val sportIdTimeCodec: GenCodec[SportId.SportId] = GenCodec.fromApplyUnapplyProvider(SportIdAU)
-  implicit val sportIdTimeKeyCodec: GenKeyCodec[SportId.SportId] = GenKeyCodec.create(SportId.withName,_.toString)
 }
 
 object EnhancedRestImplicits extends EnhancedRestImplicits {
   object ZonedDateTimeAU {
     def apply(string: String): ZonedDateTime = ZonedDateTime.parse(string)
     def unapply(dateTime: ZonedDateTime): Option[String] = Some(dateTime.toString)
-  }
-
-  object SportIdAU {
-    def apply(name: String): SportId.Value = SportId.withName(name)
-    def unapply(value: SportId.SportId): Option[String] = Some(value.toString)
   }
 }
 

@@ -19,8 +19,6 @@ object ServletRouting {
     FrontendStyle,
     FrontendScript, UdashApp,
 
-    push.Ping, push.PushStart,
-
     Cleanup
   )
 

@@ -22,6 +22,3 @@ sealed abstract class FinalRoutingState(parentState: Option[ContainerRoutingStat
 
 case object RootState extends ContainerRoutingState(None)
 case object SelectPageState extends FinalRoutingState(Some(RootState))
-case object SettingsPageState extends FinalRoutingState(Some(RootState))
-case class EditPageState(activities: Seq[FileId]) extends FinalRoutingState(Some(RootState))
-case class PushPageState(sessionId: String) extends FinalRoutingState(Some(RootState))

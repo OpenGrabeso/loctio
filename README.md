@@ -1,22 +1,17 @@
-Stravimat
-=========
+Loctio
+======
 
-The application allows spliting Strava activities and editing lap information in them. One particular use
-is to simplify handling of multisport activities like triathlon or duathlon. The application should eventually
-become an easy to use Strava uploader, especially for Suunto Quest users who need to merge heartrate and GPS data.
+The application tracks presence / location for the users connecting to it based on their IP address.
 
+Users are identified by providing GitHub access token (a token with no scopes at all is enough).
 
 Developer notes
 ---------------
 
 The application project is created in InteliJ IDEA, the project is deployed as Google App Engine.
 If you want to deploy your own build, you need to provide:
- - your own Client ID and Client Secret from your own application API registration at https://www.strava.com/settings/api.
- - your own MapBox access token
- - your own DarkSky.net (Forecast.io) secret key 
+ - a list of GitHub users which can access the server
 
-Put them in a file `resources/secret.txt`, with an ID and the secret each on its own line, like:
+Put them in a file `resources/secret.txt`, list users on the first line, separated with commas, like:
 
-    12356
-    47875454gae8974bcd798654
-    pk.eyJ1Ijoib3.......
+    User1,User2,User3

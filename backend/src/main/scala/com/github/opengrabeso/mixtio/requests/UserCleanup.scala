@@ -11,9 +11,10 @@ import common.model._
   * User specific cleanup, requires user access tokens for Strava */
 
 @SerialVersionUID(10L)
-case class UserCleanup(auth: StravaAuthResult, before: ZonedDateTime) extends DeferredTask {
+case class UserCleanup(auth: GitHubAuthResult, before: ZonedDateTime) extends DeferredTask {
   override def run(): Unit = {
 
+    /*
     val d = Storage.enumerate(namespace.stage, auth.userId)
 
     // clean activities before "before", as those are never listed to the user
@@ -42,8 +43,10 @@ case class UserCleanup(auth: StravaAuthResult, before: ZonedDateTime) extends De
     } else {
       cleanFiles(headersToClean)
     }
+     */
   }
 
+  /*
   def cleanFiles(headersToClean: Seq[(((Storage.FullName, String), ActivityHeader), ActivityId)]) = {
     for ((((file,_), h), onStrava) <- headersToClean) {
       println(s"Cleaning stage file $onStrava ${h.id} $file")
@@ -51,5 +54,7 @@ case class UserCleanup(auth: StravaAuthResult, before: ZonedDateTime) extends De
     }
 
   }
+
+   */
 
 }
