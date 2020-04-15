@@ -1,8 +1,25 @@
 package com.github.opengrabeso.loctio
+package common
 
 import java.time.temporal.ChronoUnit
-
 import java.time.{ZoneId, ZonedDateTime}
+
+import scala.reflect.ClassTag
+
+object FileStore {
+
+  // full name combined - namespace +  filename
+  object FullName {
+    def apply(namespace: String, filename: String): FullName = {
+      FullName(namespace + "/" + filename)
+    }
+  }
+
+  case class FullName(name: String)
+
+}
+
+import FileStore._
 
 trait FileStore {
   type FileItem
@@ -19,6 +36,9 @@ trait FileStore {
   def listAllItems(): Iterable[FileItem]
 
   def deleteItem(item: FileItem): Unit
+
+  def store(name: FullName, obj: AnyRef, metadata: (String, String)*): Unit
+  def load[T: ClassTag](name: FullName): Option[T]
 
   def itemName(item: FileItem): String
 
