@@ -9,6 +9,14 @@ class LocationsTest extends org.scalatest.FunSuite {
     assert(locations.locationFromIpAddress("127.0.0.0") == "localhost")
   }
 
+  test("Unknown address") {
+    object locations extends Locations(TestStorage)
+
+    locations.nameLocation("127.0.0.0", "localhost")
+
+    assert(locations.locationFromIpAddress("192.168.0.1") == "192.168.0.1")
+  }
+
   test("Merge IP address ranges") {
     val sourceData = Seq(
       "55.66.71.10" -> "HomeB",
