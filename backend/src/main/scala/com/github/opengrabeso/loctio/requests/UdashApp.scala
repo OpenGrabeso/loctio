@@ -10,6 +10,8 @@ object UdashApp  extends DefineRequest("/app") {
   def html(request: Request, resp: Response) = {
     <html>
       <head>
+        <meta charset="utf-8"/>
+        <link rel="icon" href="static/favicon.ico"/>
         <title>{appName}</title>
         <script src="frontend/script"></script> {/* scala.js compilation result */}
         <script src="frontend/dependencies"></script>{/* scala.js dependencies */}
