@@ -8,7 +8,7 @@ import scala.reflect.ClassTag
 /**
   * Simulated storage for testing
   * */
-object TestStorage extends FileStore {
+class TestStorage extends FileStore {
   case class FileItem(name: String, content: AnyRef, modified: java.util.Date, metadata: Seq[(String, String)])
 
   private val files = mutable.Map.empty[String,FileItem]

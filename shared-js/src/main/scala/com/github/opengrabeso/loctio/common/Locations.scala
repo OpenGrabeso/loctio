@@ -5,6 +5,7 @@ import FileStore._
 object Locations {
   def dropNamespace(s: String) = s.dropWhile(_ != '/').drop(1)
 
+
 }
 
 import Locations._
@@ -17,31 +18,46 @@ class Locations(storage: FileStore) {
     // TODO: consider some preliminary filtering in listAllItems to avoid listing all addresses
 
     val networkMap = storage.load[Seq[(String,String)]](FullName("network")).toSeq.flatten
-    val exactMatch = networkMap.collectFirst { case (networkAddr, name) if networkAddr == ipAddress =>
+    val binaryIP = Binary.fromIpAddress(ipAddress)
+    val matches = networkMap.collect { case (networkAddr, name) if binaryIP.startsWith(networkAddr) =>
       name
     }
-
-    exactMatch.getOrElse(ipAddress.trim)
+    // select the longest match
+    val bestMatch = if (matches.nonEmpty) Some(matches.maxBy(_.length)) else None
+    bestMatch.getOrElse(ipAddress.trim)
   }
 
   def networksFromLocations(): Unit = {
     val allLocations = storage.listAllItems().toSeq
 
+    // pairs: binary address -> name
     val networkMap = allLocations.flatMap { i =>
       val name = storage.itemName(i)
       if (name.startsWith("locations/")) {
-        val locationName = dropNamespace(name)
-        storage.load[String](FullName(name)).map(_ -> locationName)
+        val addr = dropNamespace(name)
+        storage.load[String](FullName(name)).map(location => Binary.fromIpAddress(addr) -> location)
       } else None
     }
+
+    val namedGroups = networkMap.groupBy(_._2).map { case (name, items) =>
+      val addresses = items.map(_._1)
+      // make groups starting with the same 8 bits
+      // in each of the groups determine the necessary common prefix for the left items
+      name -> addresses.groupBy(_.take(8)).map { case (prefix, values) =>
+        Binary.commonPrefix(values)
+      }
+    }.toSeq.flatMap { case (name, items) =>
+      items.map(_ -> name)
+    }
+
     // we prefer storing as a single file, this way we can be sure the storage is atomic and there are no obsolete files left
-    storage.store(FullName("network"), networkMap)
+    storage.store(FullName("network"), namedGroups)
   }
 
   def nameLocation(ipAddress: String, name: String): Unit = {
     // if multiple location names are similar, merge them (assume a dynamic address from an ISP pool)
     // avoid merging ranges too aggresively
-    storage.store(FullName("locations", name), ipAddress)
+    storage.store(FullName("locations", ipAddress), name)
     networksFromLocations()
   }
 
