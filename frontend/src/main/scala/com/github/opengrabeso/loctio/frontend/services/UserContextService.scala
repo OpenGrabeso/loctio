@@ -22,7 +22,7 @@ class UserContextService(val rpc: rest.RestAPI)(implicit ec: ExecutionContext) {
 
   private def requestPublicIpAddress(): Unit = {
 
-    val request = sttp.get(uri"http://ipinfo.io/ip")
+    val request = sttp.get(uri"https://ipinfo.io/ip")
 
     implicit val backend = FetchBackend()
     val response = request.send()
