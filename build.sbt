@@ -3,7 +3,7 @@ import sbt.Keys.scalacOptions
 import sbtcrossproject.CrossPlugin.autoImport.{crossProject, CrossType}
 
 lazy val commonSettings = Seq(
-  organization := "com.github.ondrejspanel",
+  organization := "com.github.opengrabeso",
   version := "0.4.1-beta",
   scalaVersion := "2.12.10",
   scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature")
@@ -82,11 +82,11 @@ lazy val shared = (project in file("shared"))
   )
 
 
-lazy val pushUploader = (project in file("push-uploader"))
+lazy val trayUtil = (project in file("tray-util"))
   .enablePlugins(sbtassembly.AssemblyPlugin)
   .dependsOn(shared, sharedJs_JVM)
   .settings(
-    name := "MixtioStart",
+    name := "LoctioStart",
     commonSettings,
     libraryDependencies += "com.typesafe.akka" %% "akka-http" % "10.0.9",
     libraryDependencies ++= commonLibs ++ jvmLibs,
@@ -121,8 +121,6 @@ lazy val backend = (project in file("backend"))
   .disablePlugins(sbtassembly.AssemblyPlugin)
   .dependsOn(shared, sharedJs_JVM)
   .settings(
-    name := "Mixtio",
-
     addJavaScriptToServerResources(),
     addJSDependenciesToServerResources(),
 
@@ -169,4 +167,6 @@ lazy val jetty = (project in file("jetty")).dependsOn(backend).settings(
   )
 )
 
-lazy val root = (project in file(".")).aggregate(backend)
+lazy val root = (project in file(".")).aggregate(backend).settings(
+  name := "Loctio"
+)

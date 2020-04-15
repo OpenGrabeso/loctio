@@ -9,7 +9,7 @@
     <filter-class>spark.servlet.SparkFilter</filter-class>
     <init-param>
       <param-name>applicationClass</param-name>
-      <param-value>com.github.opengrabeso.mixtio.ServletRouting</param-value>
+      <param-value>com.github.opengrabeso.loctio.ServletRouting</param-value>
     </init-param>
   </filter>
 

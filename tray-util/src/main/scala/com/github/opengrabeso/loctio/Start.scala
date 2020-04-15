@@ -65,11 +65,11 @@ object Start extends App {
       tryLocalServer(ServerLocal4567)
     }
 
-    // try communicating with the local Stravimat, if not responding, use the remote one
+    // try communicating with the local Loctio, if not responding, use the remote one
     Try(Await.result(localFound.future, Duration(2000, duration.MILLISECONDS))).getOrElse(ServerProduction)
   }
 
-  private val stravimatUrl = server.url
+  private val loctiotUrl = server.url
 
   def login() = {
 
