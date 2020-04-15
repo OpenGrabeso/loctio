@@ -21,12 +21,10 @@ object RestAPIServer extends RestAPI with RestAPIUtils {
     if (logging) println(s"Try userAPI for token $token")
     val fullName = Storage.FullName("login", token)
     val auth = Storage.load[GitHubAuthResult](fullName).map { a =>
-      if (a.token == token) {
-        if (logging) println(s"Get userAPI for user ${a.login}")
-        a
-      } else {
-        throw HttpErrorException(401, "Provided auth code '$authCode' does not match the one stored on the server")
-      }
+      assert(a.token == token)
+      authorized(a.login)
+      if (logging) println(s"Get userAPI for user ${a.login}")
+      a
     }.getOrElse {
       val auth = Main.gitHubAuth(token)
       if (logging) println(s"Create userAPI for user ${auth.login}")

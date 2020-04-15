@@ -51,23 +51,23 @@ object Main extends common.Formatting {
     jsonMapper.readTree(response.getContent)
   }
 
-  def gitHubAuth(token: String): GitHubAuthResult = {
-
+  def authorized(login: String): Unit = {
     val SecretResult(users, _) = secret
+    if (!users.contains(login)) {
+      throw HttpErrorException(403, s"User $login not authorized. Contact server administrator to get the access")
+    }
+  }
 
+  def gitHubAuth(token: String): GitHubAuthResult = {
     val responseJson = authRequest(token)
 
     val login = responseJson.path("login").textValue
     val name = responseJson.path("name").textValue
 
-    if (users.contains(login)) {
+    authorized(login)
 
-      val auth = GitHubAuthResult(token, login, name)
-      rest.RestAPIServer.createUser(auth)
-      auth
-    } else {
-      throw HttpErrorException(403, "Contact server administrator to get the access")
-    }
+    val auth = GitHubAuthResult(token, login, name)
+    rest.RestAPIServer.createUser(auth)
   }
 
 }
