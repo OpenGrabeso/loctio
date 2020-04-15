@@ -30,7 +30,7 @@ class UserContextService(val rpc: rest.RestAPI)(implicit ec: ExecutionContext) {
       case Success(r) =>
         r.body match {
           case Right(string) =>
-            println(s"Obtained a public IP address $string")
+            println(s"Obtained a public IP address ${string.trim}")
             publicIpAddress.success(string.trim)
           case Left(value) =>
             publicIpAddress.failure(new UnsupportedOperationException(value))
