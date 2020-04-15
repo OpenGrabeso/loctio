@@ -11,6 +11,9 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
   }
 
   def listUsers = syncResponse {
+    // make sure the user making the query is always reported as online
+    // note: we do not have his ip address, therefore we cannot change the location yet,
+    Presence.reportUser(userAuth.login)
     Presence.listUsers
   }
 

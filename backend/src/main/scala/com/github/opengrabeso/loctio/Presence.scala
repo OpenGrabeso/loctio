@@ -18,6 +18,14 @@ object Presence {
     store(FullName("presence", login), info)
   }
 
+  def reportUser(login: String): Unit = {
+    val fullName = FullName("presence", login)
+    for (current <- load[PresenceInfo](fullName)) {
+      val now = ZonedDateTime.now().withZoneSameInstant(ZoneOffset.UTC)
+      store(fullName, current.copy(lastSeen = now))
+    }
+  }
+
   def locationFromIpAddress(ipAddress: String): String = {
     ipAddress.trim
   }
