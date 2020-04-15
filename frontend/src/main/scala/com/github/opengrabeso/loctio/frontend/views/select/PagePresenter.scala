@@ -23,10 +23,13 @@ class PagePresenter(
   def init(): Unit = {
     // load the settings before installing the handler
     // otherwise both handlers are called, which makes things confusing
+    println("Loading props")
     props.listen { p =>
       loadUsers(p.token)
     }
-    props.set(SettingsModel.load)
+    val loaded = SettingsModel.load
+    println(s"Loaded props $loaded")
+    props.set(loaded)
   }
 
   def loadUsers(token: String) = {
