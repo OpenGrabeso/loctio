@@ -18,7 +18,7 @@ object Main extends common.Formatting {
       val secretStream = Main.getClass.getResourceAsStream(filename)
       val lines = scala.io.Source.fromInputStream(secretStream).getLines
       val usersLine = lines.next()
-      val users = usersLine.split(",").map(_.trim)
+      val users = usersLine.split(",").map(_.trim.toLowerCase)
       SecretResult(users.toSet, "")
     } catch {
       case _: NullPointerException => // no file found
@@ -53,7 +53,7 @@ object Main extends common.Formatting {
 
   def authorized(login: String): Unit = {
     val SecretResult(users, _) = secret
-    if (!users.contains(login)) {
+    if (!users.contains(login.toLowerCase)) {
       throw HttpErrorException(403, s"User $login not authorized. Contact server administrator to get the access")
     }
   }
