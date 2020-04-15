@@ -142,8 +142,8 @@ object Storage extends common.FileStore {
     }
   }
 
-  def metadata(namespace: String, path: String): Seq[(String, String)] = {
-    val prefix = userFilename(namespace, path)
+  def metadata(name: FullName): Seq[(String, String)] = {
+    val prefix = name
     val blobs = storage.list(bucket, BlobListOption.prefix(prefix.name))
     val found = blobs.iterateAll().asScala
 
@@ -163,13 +163,13 @@ object Storage extends common.FileStore {
     }
   }
 
-  def metadataValue(namespace: String, path: String, name: String): Option[String] = {
-    val md = metadata(namespace, path)
+  def metadataValue(item: FullName, name: String): Option[String] = {
+    val md = metadata(item)
     md.find(_._1 == name).map(_._2)
   }
 
-  def updateMetadata(file: String, metadata: Seq[(String, String)]): Boolean = {
-    val blobId = fileId(file)
+  def updateMetadata(item: FullName, metadata: Seq[(String, String)]): Boolean = {
+    val blobId = fileId(item.name)
     val md = storage.get(blobId, BlobGetOption.fields(BlobField.METADATA))
     val userData = Option(md.getMetadata).getOrElse(new java.util.HashMap[String, String]).asScala
     val matching = metadata.forall { case (key, name) =>
