@@ -16,6 +16,14 @@ object SelectPageStyles extends CssBase {
     fontSize(1 rem)
   )
 
+  val statusTd = style(
+    verticalAlign.middle.important
+  )
+
+  val stateIcon = style(
+    height(1 rem)
+  )
+
   val containerBorder = mixin(
     margin(10 px),
     padding(5 px),
@@ -28,6 +36,7 @@ object SelectPageStyles extends CssBase {
   val container: CssStyle = style(
     margin.auto,
     containerBorder,
+    maxWidth(800 px)
   )
 
   val settingsContainer = style(
@@ -39,9 +48,6 @@ object SelectPageStyles extends CssBase {
   )
 
 
-  val uploading: CssStyle = style(
-    backgroundColor.lightblue
-  )
   val error: CssStyle = style(
     backgroundColor.red
   )

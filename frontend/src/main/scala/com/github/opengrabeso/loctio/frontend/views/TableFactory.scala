@@ -13,7 +13,7 @@ import scalatags.JsDom.all._
 object TableFactory {
   val s = SelectPageStyles
 
-  case class TableAttrib[ItemType](name: String, value: (ItemType, ModelProperty[ItemType], NestedInterceptor) => Seq[Node], shortName: Option[String] = None)
+  case class TableAttrib[ItemType](name: String, value: (ItemType, ModelProperty[ItemType], NestedInterceptor) => Modifier, shortName: Option[String] = None)
 
   def headerFactory[ItemType](attribs: Seq[TableAttrib[ItemType]]): NestedInterceptor => Modifier = _ => tr {
     attribs.flatMap { a =>

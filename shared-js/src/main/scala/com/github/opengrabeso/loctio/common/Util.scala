@@ -3,7 +3,7 @@ package common
 
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import java.time.{ZoneOffset, ZonedDateTime}
+import java.time.{Duration, ZoneOffset, ZonedDateTime}
 
 trait Util {
 
@@ -26,7 +26,7 @@ trait Util {
     }
   }
 
-  implicit def zonedDateTimeOrdering: Ordering[ZonedDateTime] = new Ordering[ZonedDateTime] {
+  implicit object zonedDateTimeOrdering extends  Ordering[ZonedDateTime] {
     override def compare(x: ZonedDateTime, y: ZonedDateTime): Int = x.compareTo(y)
   }
 
