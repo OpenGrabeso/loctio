@@ -5,7 +5,6 @@ package select
 
 import java.time.{Duration, ZonedDateTime}
 
-import com.github.opengrabeso.loctio.dataModel.SettingsModel
 import common.css._
 import io.udash._
 import io.udash.bootstrap.button.UdashButton
@@ -19,9 +18,8 @@ import scalatags.JsDom.all._
 
 class PageView(
   model: ModelProperty[PageModel],
-  presenter: PagePresenter,
-  globals: ModelProperty[SettingsModel]
-) extends Headers.PageView(globals, presenter) with FinalView with CssView with PageUtils with TimeFormatting {
+  presenter: PagePresenter
+) extends Headers.PageView(model, presenter) with FinalView with CssView with PageUtils with TimeFormatting {
   val s = SelectPageStyles
 
 

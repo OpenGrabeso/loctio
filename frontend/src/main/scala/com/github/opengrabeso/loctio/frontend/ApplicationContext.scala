@@ -1,18 +1,17 @@
 package com.github.opengrabeso.loctio
 package frontend
 
+import rest.RestAPI
 import routing._
 import common.model._
 import io.udash._
 
 object ApplicationContext {
-  import scala.concurrent.ExecutionContext.Implicits.global
-
   private val routingRegistry = new RoutingRegistryDef
   private val viewFactoryRegistry = new StatesToViewFactoryDef
 
   val application = new Application[RoutingState](routingRegistry, viewFactoryRegistry)
-  val userContextService = new services.UserContextService(com.github.opengrabeso.loctio.rest.RestAPIClient.api)
+  val rpc: RestAPI = com.github.opengrabeso.loctio.rest.RestAPIClient.api
 
   /*
   val userAPI = for {

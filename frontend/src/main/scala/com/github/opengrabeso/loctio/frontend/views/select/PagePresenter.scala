@@ -3,27 +3,91 @@ package frontend
 package views
 package select
 
+import rest.RestAPI
 import com.github.opengrabeso.loctio.dataModel.SettingsModel
-import java.time.ZonedDateTime
 
+import com.softwaremill.sttp._
 import common.model._
 import routing._
 import io.udash._
 
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Promise}
 import scala.scalajs.js.timers._
 import scala.util.{Failure, Success, Try}
+
+
+object PagePresenter {
+  case class UserContextData(userId: String, token: String)
+}
+
+import PagePresenter._
 
 /** Contains the business logic of this view. */
 class PagePresenter(
   model: ModelProperty[PageModel],
   application: Application[RoutingState],
-  userService: services.UserContextService
+  rpc: RestAPI
 )(implicit ec: ExecutionContext) extends Headers.PagePresenter[SelectPageState.type](application) {
 
-  def props: ModelProperty[SettingsModel] = userService.properties
+  def props: ModelProperty[SettingsModel] = model.subModel(_.settings)
+  def properties = props
+
   private def currentToken: String = props.subProp(_.token).get
-  private def userAPI = userService.rpc.user(currentToken)
+
+  var userData: Promise[UserContextData] = _
+
+  private val publicIpAddress = Promise[String]()
+
+  private def requestPublicIpAddress(): Unit = {
+
+    val request = sttp.get(uri"https://ipinfo.io/ip")
+
+    implicit val backend = FetchBackend()
+    val response = request.send()
+    response.onComplete {
+      case Success(r) =>
+        r.body match {
+          case Right(string) =>
+            println(s"Obtained a public IP address ${string.trim}")
+            publicIpAddress.success(string.trim)
+          case Left(value) =>
+            publicIpAddress.failure(new UnsupportedOperationException(value))
+        }
+      case Failure(ex) =>
+        publicIpAddress.failure(ex)
+    }
+  }
+
+  requestPublicIpAddress()
+
+  println(s"Create UserContextService, token ${properties.subProp(_.token).get}")
+  properties.subProp(_.token).listen {token =>
+    println(s"listen: Start login $token")
+    userData = Promise()
+    val loginFor = userData // capture the value, in case another login starts for a different token before this one is completed
+    rpc.user(token).name.onComplete {
+      case Success(r) =>
+        println(s"Login - new user $r")
+        properties.subProp(_.login).set(r._1)
+        properties.subProp(_.fullName).set(r._2)
+        loginFor.success(UserContextData(r._1, token))
+
+        for {
+          context <- loginFor.future
+          publicIp <- publicIpAddress.future
+        } {
+          rpc.user(context.token).report(publicIp, "online")
+        }
+
+      case Failure(ex) =>
+        loginFor.failure(ex)
+    }
+  }
+
+
+
+
+  private def userAPI = rpc.user(currentToken)
 
   var interval = Option.empty[SetIntervalHandle]
 
@@ -60,7 +124,7 @@ class PagePresenter(
   }
 
   private def doLoadUsers(token: String) = {
-    userService.rpc.user(token).listUsers.onComplete(loadUsersCallback)
+    rpc.user(token).listUsers.onComplete(loadUsersCallback)
   }
   def loadUsers(token: String) = {
     model.subProp(_.loading).set(true)

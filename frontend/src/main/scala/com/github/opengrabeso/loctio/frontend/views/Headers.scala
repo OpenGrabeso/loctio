@@ -18,9 +18,10 @@ object Headers {
   abstract class PagePresenter[T<: State](application: Application[RoutingState]) extends Presenter[T] {
     def gotoMain(): Unit = application.goTo(SelectPageState)
   }
-  abstract class PageView[T<: State](globals: ModelProperty[SettingsModel], presenter: PagePresenter[T]) extends CssView with PageUtils {
+  abstract class PageView[T<: State](model: ModelProperty[PageModel], presenter: PagePresenter[T]) extends CssView with PageUtils {
     import scalatags.JsDom.all._
 
+    protected def globals = model.subModel(_.settings)
 
     private val settingsToken = Property[String]("")
     private val settingsOkButton = UdashButton(
