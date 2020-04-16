@@ -24,7 +24,17 @@ class Locations(storage: FileStore) {
     }
     // select the longest match
     val bestMatch = if (matches.nonEmpty) Some(matches.maxBy(_.length)) else None
-    bestMatch.getOrElse(ipAddress.trim)
+    bestMatch.orElse {
+      // if exact match is not possible, try guessing
+      val guesses = networkMap.flatMap { case (networkAddr, name) =>
+        val common = Binary.commonPrefixLength(Seq(networkAddr, binaryIP))
+        if (common >= 24) Some(common -> (name + "(?)"))
+        else if (common >= 16) Some(common -> (name + "(??)"))
+        else if (common >= 8) Some(common -> (name + "(???)"))
+        else None
+      }
+      if (guesses.nonEmpty) Some(guesses.maxBy(_._1)._2) else None
+    }.getOrElse(ipAddress.trim)
   }
 
   def networksFromLocations(): Unit = {

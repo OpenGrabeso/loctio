@@ -94,4 +94,18 @@ class LocationsTest extends org.scalatest.funsuite.AnyFunSuite {
 
   }
 
+  test("Guess when there is no exact match") {
+    val sourceData = Seq(
+      "44.33.131.205" -> "Office",
+    )
+    val testData = Seq(
+      "44.33.131.110" -> "Office(?)",
+      "44.33.121.215" -> "Office(??)",
+      "44.22.121.215" -> "Office(???)",
+      "1.2.3.4" -> "1.2.3.4",
+    )
+
+    testForMany(sourceData, testData)
+
+  }
 }
