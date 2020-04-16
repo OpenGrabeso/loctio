@@ -35,6 +35,10 @@ class PagePresenter(
       loadUsers(p.token)
       interval.foreach(clearInterval)
       interval = Some(setInterval(60000) { // once per minute
+
+        // check if we are active or not
+        // when not, do not report anything
+
         refreshUsers()
       })
     }

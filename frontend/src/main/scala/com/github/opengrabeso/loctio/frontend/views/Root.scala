@@ -23,22 +23,17 @@ object Root {
     model: ModelProperty[PageModel],
     userContextService: services.UserContextService,
     application: Application[RoutingState]
-  )(implicit ec: ExecutionContext) extends Presenter[RootState.type] {
+  )(implicit ec: ExecutionContext) extends Headers.PagePresenter[RootState.type](application) {
 
 
     override def handleState(state: RootState.type): Unit = {}
-
-    def gotoMain(): Unit = application.goTo(SelectPageState)
-
-    def gotoSettings(): Unit = application.goTo(SettingsPageState)
-
   }
 
 
   class View(
     model: ModelProperty[PageModel], presenter: PagePresenter,
     globals: ModelProperty[SettingsModel]
-  ) extends ContainerView with CssView with views.PageUtils {
+  ) extends Headers.PageView[RootState.type](globals, presenter) with ContainerView with CssView with views.PageUtils {
 
     import scalatags.JsDom.all._
 
@@ -46,79 +41,10 @@ object Root {
 
     buttonOnClick(settingsButton) {presenter.gotoSettings()}
 
-
-
-    val header: Seq[HTMLElement] = {
-      val name = globals.subProp(_.fullName)
-      val userId = globals.subProp(_.login)
-
-      Seq(
-        div(
-          //GlobalStyles.header,
-          id := "header",
-          table(
-            tbody(
-              tr(
-                td(
-                  settingsButton
-                ),
-                td(
-                  table(
-                    tbody(
-                      tr(td(a(
-                        href := "/", appName,
-                        onclick :+= {_: dom.Event =>
-                          presenter.gotoMain()
-                          true
-                        }
-                      ))),
-                      tr(td(
-                        "User:",
-                        produce(userId) { s =>
-                          a(href := s"https://www.github.com/$s", bind(name)).render
-                        }
-                      ))
-                    )
-                  )
-                )
-              )
-            )
-          )
-        ).render
-      )
-    }
-
-
-    val footer: Seq[HTMLElement] = Seq(
-      div(
-        //GlobalStyles.footer,
-        id := "footer",
-        a(
-          href := "http://www.github.com/",
-          id := "powered_by_github",
-          rel := "nofollow"
-        ),
-        p(
-          GlobalStyles.footerText,
-          " © 2020 ",
-          a(
-            href := s"https://github.com/OndrejSpanel/$gitHubName",
-            GlobalStyles.footerLink,
-          ),
-          "Ondřej Španěl",
-          div()
-        )
-      ).render
-    )
-
     // ContainerView contains default implementation of child view rendering
     // It puts child view into `childViewContainer`
     override def getTemplate: Modifier = div(
-      // loads Bootstrap and FontAwesome styles from CDN
-      UdashBootstrap.loadBootstrapStyles(),
-      UdashBootstrap.loadFontAwesome(),
-
-      BootstrapStyles.container,
+      prefix,
       header,
       childViewContainer,
       footer

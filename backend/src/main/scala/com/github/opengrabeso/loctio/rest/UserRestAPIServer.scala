@@ -23,7 +23,6 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
     // check last ip address for the user
     Presence.getUserIpAddress(login).map { ipAddress =>
       Locations.nameLocation(ipAddress, name)
-      Presence.reportUser(userAuth.login)
       Presence.listUsers
     }.getOrElse(throw HttpErrorException(500, "User presence not found"))
   }
