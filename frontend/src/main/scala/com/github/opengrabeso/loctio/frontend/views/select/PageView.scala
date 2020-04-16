@@ -130,7 +130,6 @@ class PageView(
       div(
         div( // this will have a border
           s.container,
-          setLocationModal,
           div(
             showIfElse(model.subProp(_.loading))(
               p("Loading...").render,
@@ -141,6 +140,10 @@ class PageView(
             )
           )
         ),
+      ),
+      div(
+        s.hideModals,
+        setLocationModal,
       ),
       footer
     )

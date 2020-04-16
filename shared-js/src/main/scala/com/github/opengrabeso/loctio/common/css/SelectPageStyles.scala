@@ -33,6 +33,10 @@ object SelectPageStyles extends CssBase {
     borderWidth(1 px)
   )
 
+  val hideModals = style(
+    display.none
+  )
+
   val container: CssStyle = style(
     margin.auto,
     containerBorder,
