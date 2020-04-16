@@ -15,5 +15,4 @@ sealed abstract class RoutingState() extends State {
   def parentState = None
 }
 
-case object SettingsPageState extends RoutingState()
 case object SelectPageState extends RoutingState()
