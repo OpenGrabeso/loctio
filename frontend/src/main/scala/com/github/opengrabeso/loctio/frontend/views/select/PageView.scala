@@ -28,7 +28,7 @@ class PageView(
       case  "online" | "busy" =>
         val now = ZonedDateTime.now()
         val age = Duration.between(time, now).toMinutes
-        if (age < 10) {
+        if (age < 5) {
           state
         } else if (age < 60) {
           "away"
@@ -84,15 +84,28 @@ class PageView(
     }
   }
   def userDropDown(ar: UserRow) = {
-    val callback = () => {
+    def callback(): Unit = {
       setLocationUser.set(ar.login)
       setLocationAddr.set(ar.location)
       setLocationLocation.set(locationRealNameOnly(ar.location))
       setLocationModal.show()
     }
-    val items = SeqProperty[UdashDropdown.DefaultDropdownItem](Seq(
-      UdashDropdown.DefaultDropdownItem.Button("Name location", callback),
-    ))
+    def toggleInvisible(): Unit = {
+      model.subProp(_.invisible).set(!model.subProp(_.invisible).get)
+      presenter.refreshUsers()
+    }
+    val itemSeq = if (ar.login == model.subModel(_.settings).subProp(_.login).get) {
+      Seq(
+        UdashDropdown.DefaultDropdownItem.Button("Name location", callback),
+        UdashDropdown.DefaultDropdownItem.Button("Toggle invisible", toggleInvisible),
+      )
+    } else {
+      Seq(
+        UdashDropdown.DefaultDropdownItem.Button("Name location", callback),
+      )
+    }
+
+    val items = SeqProperty[UdashDropdown.DefaultDropdownItem](itemSeq)
 
     val dropdown = UdashDropdown.default(items)(_ => Seq[Modifier]("", Button.color(Color.Primary)))
     dropdown.render
@@ -129,6 +142,7 @@ class PageView(
         div( // this will have a border
           s.container,
           div(
+            bind(model.subProp(_.debug)),
             showIfElse(model.subProp(_.loading))(
               p("Loading...").render,
               div(

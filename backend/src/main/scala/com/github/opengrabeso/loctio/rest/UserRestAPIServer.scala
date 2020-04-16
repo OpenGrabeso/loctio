@@ -6,7 +6,7 @@ import io.udash.rest.raw.HttpErrorException
 class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI with RestAPIUtils {
   private def checkState(state: String) = {
     state match {
-      case "online" | "offline" | "busy" =>
+      case "online" | "offline" | "busy" | "away" =>
       case _ =>
         throw HttpErrorException(400, s"Unknown state $state")
     }
@@ -38,17 +38,27 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
   def listUsers(ipAddress: String, state: String) = syncResponse {
     checkState(state)
     checkIpAddress(ipAddress)
-    // make sure the user making the query is always reported as online
-    // note: we do not have his ip address, therefore we cannot change the location yet,
-    Presence.reportUser(userAuth.login, ipAddress, state)
+    if (state != "away") {
+      // when the user is away, do not update his presence
+      if (state == "offline") {
+        // when going offline, report only when we were not offline yet
+        // this is important esp. for invisible, which will continue calling listUsers
+        if (Presence.getUser(userAuth.login).forall(_.state != "offline")) {
+          Presence.reportUser(userAuth.login, ipAddress, state)
+        }
+      }
+      else {
+        Presence.reportUser(userAuth.login, ipAddress, state)
+      }
+    }
     Presence.listUsers
   }
 
   def setLocationName(login: String, name: String) = syncResponse {
     checkLoginName(name)
     // check last ip address for the user
-    Presence.getUserIpAddress(login).map { ipAddress =>
-      Locations.nameLocation(ipAddress, name)
+    Presence.getUser(login).map { presence =>
+      Locations.nameLocation(presence.ipAddress, name)
       Presence.listUsers
     }.getOrElse(throw HttpErrorException(500, "User presence not found"))
   }

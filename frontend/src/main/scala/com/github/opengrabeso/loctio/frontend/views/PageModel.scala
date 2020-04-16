@@ -6,6 +6,8 @@ import io.udash._
 /** The form's model structure. */
 case class PageModel(
   loading: Boolean,
+  debug: String = null,
+  invisible: Boolean = false,
   settings: dataModel.SettingsModel = dataModel.SettingsModel(),
   users: Seq[select.UserRow] = Seq.empty,
   error: Option[Throwable] = None

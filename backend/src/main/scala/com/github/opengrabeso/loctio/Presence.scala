@@ -21,8 +21,8 @@ object Presence {
     store(FullName("state", login), info)
   }
 
-  def getUserIpAddress(login: String): Option[String] = {
-    load[PresenceInfo](FullName("state", login)).map(_.ipAddress)
+  def getUser(login: String): Option[PresenceInfo] = {
+    load[PresenceInfo](FullName("state", login))
   }
 
   def listUsers: Seq[(String, LocationInfo)] = {

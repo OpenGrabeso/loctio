@@ -5,11 +5,12 @@ package select
 
 import rest.RestAPI
 import com.github.opengrabeso.loctio.dataModel.SettingsModel
-
-import com.softwaremill.sttp._
+import com.softwaremill.sttp.{dom => _, _}
 import common.model._
 import routing._
 import io.udash._
+import io.udash.wrappers.jquery.jQ
+import org.scalajs.dom
 
 import scala.concurrent.{ExecutionContext, Promise}
 import scala.scalajs.js.timers._
@@ -33,6 +34,7 @@ class PagePresenter(
   def properties = props
 
   private def currentToken: String = props.subProp(_.token).get
+  private def currentLogin: String = props.subProp(_.login).get
 
   private val publicIp = Property[String]("")
 
@@ -41,7 +43,7 @@ class PagePresenter(
   private val publicIpAddress = Promise[String]()
 
   private def requestPublicIpAddress(): Unit = {
-
+    // TODO: we should refresh public address from time to time, it can change (network change, physical computer location change)
     val request = sttp.get(uri"https://ipinfo.io/ip")
 
     implicit val backend = FetchBackend()
@@ -92,7 +94,8 @@ class PagePresenter(
 
   private def userAPI = rpc.user(currentToken)
 
-  var interval = Option.empty[SetIntervalHandle]
+  private var interval = Option.empty[SetIntervalHandle]
+  private var lastActive: Long = System.currentTimeMillis()
 
   // must be called once both login and public IP address are known
   def startListening(): Unit = {
@@ -101,6 +104,7 @@ class PagePresenter(
     assert(token.nonEmpty)
     assert(ipAddress.nonEmpty)
 
+    lastActive = System.currentTimeMillis()
     refreshUsers(token, ipAddress)
 
     interval.foreach(clearInterval)
@@ -110,6 +114,12 @@ class PagePresenter(
       // when not, do not report anything
 
       refreshUsers(token, ipAddress)
+    })
+
+
+    jQ("body").on("mousedown keydown touchstart mousemove scroll", (el, ev) => {
+      lastActive = System.currentTimeMillis()
+      //model.subProp(_.debug).set(s"Last active at $lastActive")
     })
   }
 
@@ -128,7 +138,12 @@ class PagePresenter(
         case Success(value) =>
           model.subProp(_.loading).set(false)
           model.subProp(_.users).set(value.map { u =>
-            UserRow(u._1, u._2.location, u._2.lastSeen, u._2.state)
+            if (u._1 == currentLogin) {
+              val currentUserState = if (model.subProp(_.invisible).get) "invisible" else u._2.state
+              UserRow(u._1, u._2.location, u._2.lastSeen, currentUserState)
+            } else {
+              UserRow(u._1, u._2.location, u._2.lastSeen, u._2.state)
+            }
           })
           model.subProp(_.loading).set(false)
         case Failure(exception) =>
@@ -138,12 +153,16 @@ class PagePresenter(
     }
   }
 
-  private def doLoadUsers(token: String, ipAddress: String, state: String) = {
+  def refreshUsers(token: String, ipAddress: String): Unit = {
+    val invisible = model.subProp(_.invisible).get
+    val sinceLastActiveMin = (System.currentTimeMillis() - lastActive) / 60000
+
+    val state = if (invisible) "offline" else if (sinceLastActiveMin < 5) "online" else "away"
     rpc.user(token).listUsers(ipAddress, state).onComplete(loadUsersCallback(token, _))
   }
 
-  def refreshUsers(token: String, ipAddress: String) = {
-    doLoadUsers(token, ipAddress, "online")
+  def refreshUsers(): Unit = {
+    refreshUsers(currentToken, publicIp.get)
   }
 
   def setLocationName(login: String, location: String): Unit = {

@@ -21,7 +21,7 @@ object SettingsModel extends HasModelPropertyCreator[SettingsModel] {
   }
 
   def store(model: SettingsModel): Unit = {
-    println(s"Store $model")
+    //println(s"Store $model")
     for ((k, v) <- values) {
       // prefer session storage if available
       val value = v._1(model)
