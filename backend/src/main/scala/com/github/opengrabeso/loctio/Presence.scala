@@ -28,8 +28,12 @@ object Presence {
     }
   }
 
+  def getUserIpAddress(login: String): Option[String] = {
+    load[PresenceInfo](FullName("presence", login)).map(_.ipAddress)
+  }
+
   def listUsers: Seq[(String, LocationInfo)] = {
-    val items = enumerate("presence")
+    val items = enumerate("presence/")
     items.map(i => i._2 -> load[PresenceInfo](i._1)).flatMap { case (login, data) =>
       // we need to transfer the time as UTC, otherwise the JS client is unable to decode it
       data.map(d => login -> LocationInfo(Locations.locationFromIpAddress(d.ipAddress), d.lastSeen.withZoneSameInstant(ZoneOffset.UTC)))

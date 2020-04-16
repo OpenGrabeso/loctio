@@ -12,6 +12,7 @@ import scala.concurrent.Future
 
 trait UserRestAPI {
 
+
   @GET
   def name: Future[(String, String)]
 
@@ -20,6 +21,10 @@ trait UserRestAPI {
 
   @GET
   def listUsers: Future[Seq[(String, LocationInfo)]]
+
+  @PUT
+  def setLocationName(login: String, location: String): Future[Seq[(String, LocationInfo)]]
+
 }
 
 object UserRestAPI extends RestApiCompanion[EnhancedRestImplicits,UserRestAPI](EnhancedRestImplicits)
