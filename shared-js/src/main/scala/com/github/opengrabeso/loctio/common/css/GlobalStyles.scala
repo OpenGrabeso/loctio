@@ -79,7 +79,7 @@ object GlobalStyles extends CssBase {
   )
 
   val headerFooterCommon = mixin(
-    backgroundColor(c"#fca"),
+    backgroundColor(c"#dfc"),
     overflow.auto,
     flexGrow(0),
     flexDirection.column
