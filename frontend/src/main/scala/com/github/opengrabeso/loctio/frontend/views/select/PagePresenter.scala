@@ -5,11 +5,13 @@ package select
 
 import com.github.opengrabeso.loctio.dataModel.SettingsModel
 import java.time.ZonedDateTime
+
+import common.model._
 import routing._
 import io.udash._
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 /** Contains the business logic of this view. */
 class PagePresenter(
@@ -19,6 +21,7 @@ class PagePresenter(
 )(implicit ec: ExecutionContext) extends Presenter[SelectPageState.type] {
 
   def props: ModelProperty[SettingsModel] = userService.properties
+  private def userAPI = userService.rpc.user(props.subProp(_.token).get)
 
   def init(): Unit = {
     // load the settings before installing the handler
@@ -32,22 +35,29 @@ class PagePresenter(
     props.set(loaded)
   }
 
+
+  def loadUsersCallback(res: Try[Seq[(String, LocationInfo)]]) = res match {
+    case Success(value) =>
+      model.subProp(_.users).set(value.map { u =>
+        UserRow(u._1, u._2.location, u._2.lastSeen)
+      })
+      model.subProp(_.loading).set(false)
+    case Failure(exception) =>
+      model.subProp(_.error).set(Some(exception))
+      model.subProp(_.loading).set(false)
+  }
+
   def loadUsers(token: String) = {
     model.subProp(_.loading).set(true)
     model.subProp(_.users).set(Nil)
 
-    userService.rpc.user(token).listUsers.onComplete {
-      case Success(value) =>
-        model.subProp(_.users).set(value.map { u =>
-          UserRow(u._1, u._2.location, u._2.lastSeen)
-        })
-        model.subProp(_.loading).set(false)
-      case Failure(exception) =>
-        model.subProp(_.error).set(Some(exception))
-        model.subProp(_.loading).set(false)
-    }
-
+    userService.rpc.user(token).listUsers.onComplete(loadUsersCallback)
   }
+
+  def setLocationName(login: String, location: String): Unit = {
+    userAPI.setLocationName(login, location).onComplete(loadUsersCallback)
+  }
+
 
   override def handleState(state: SelectPageState.type): Unit = {}
 }

@@ -1,7 +1,6 @@
 package com.github.opengrabeso.loctio
 
 import java.io._
-import java.net.{URLDecoder, URLEncoder}
 import java.nio.channels.Channels
 
 import com.google.auth.oauth2.GoogleCredentials
@@ -13,26 +12,17 @@ import org.apache.commons.io.IOUtils
 
 import scala.reflect.ClassTag
 
-object Storage extends FileStore {
+import common.FileStore.FullName
 
-
+object Storage extends common.FileStore {
   // from https://cloud.google.com/appengine/docs/standard/java/using-cloud-storage
-
   final val bucket = "loctio.appspot.com"
 
-  // full name combined - namespace, filename, user Id
-  object FullName {
-    def apply(namespace: String, filename: String): FullName = {
-      // user id needed so that files from different users are not conflicting
-      FullName(namespace + "/" + filename)
-    }
-  }
-
-  case class FullName(name: String)
+  type FileItem = Blob
 
   private def fileId(filename: String) = BlobId.of(bucket, filename)
 
-  private def userFilename(namespace: String, filename: String) = FullName.apply(namespace, filename)
+  private def userFilename(namespace: String, filename: String) = FullName(namespace, filename)
 
   val credentials = GoogleCredentials.getApplicationDefault
   val storage = StorageOptions.newBuilder().setCredentials(credentials).build().getService
@@ -128,15 +118,13 @@ object Storage extends FileStore {
   }
 
 
-  def enumerate(namespace: String, filter: Option[String => Boolean] = None): Iterable[(FullName, String)] = {
-
-    val prefix = userFilename(namespace, "")
-    val blobs = storage.list(bucket, BlobListOption.prefix(prefix.name))
+  def enumerate(prefix: String, filter: Option[String => Boolean] = None): Iterable[(FullName, String)] = {
+    val blobs = storage.list(bucket, BlobListOption.prefix(prefix))
     val list = blobs.iterateAll().asScala
     val actStream = for (iCandidate <- list) yield {
       val iName = iCandidate.getName
-      assert(iName.startsWith(prefix.name))
-      FullName(iName) -> iName.drop(prefix.name.length)
+      assert(iName.startsWith(prefix))
+      FullName(iName) -> iName.drop(prefix.length)
     }
     actStream.toVector  // toVector to avoid debugging streams, we are always traversing all of them anyway
   }
@@ -152,8 +140,8 @@ object Storage extends FileStore {
     }
   }
 
-  def metadata(namespace: String, path: String): Seq[(String, String)] = {
-    val prefix = userFilename(namespace, path)
+  def metadata(name: FullName): Seq[(String, String)] = {
+    val prefix = name
     val blobs = storage.list(bucket, BlobListOption.prefix(prefix.name))
     val found = blobs.iterateAll().asScala
 
@@ -173,13 +161,13 @@ object Storage extends FileStore {
     }
   }
 
-  def metadataValue(namespace: String, path: String, name: String): Option[String] = {
-    val md = metadata(namespace, path)
+  def metadataValue(item: FullName, name: String): Option[String] = {
+    val md = metadata(item)
     md.find(_._1 == name).map(_._2)
   }
 
-  def updateMetadata(file: String, metadata: Seq[(String, String)]): Boolean = {
-    val blobId = fileId(file)
+  def updateMetadata(item: FullName, metadata: Seq[(String, String)]): Boolean = {
+    val blobId = fileId(item.name)
     val md = storage.get(blobId, BlobGetOption.fields(BlobField.METADATA))
     val userData = Option(md.getMetadata).getOrElse(new java.util.HashMap[String, String]).asScala
     val matching = metadata.forall { case (key, name) =>
@@ -221,8 +209,6 @@ object Storage extends FileStore {
       }
     }
   }
-
-  type FileItem = Blob
 
   def listAllItems(): Iterable[FileItem] = {
 

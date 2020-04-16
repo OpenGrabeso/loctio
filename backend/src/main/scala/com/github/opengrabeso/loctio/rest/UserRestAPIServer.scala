@@ -1,6 +1,8 @@
 package com.github.opengrabeso.loctio
 package rest
 
+import io.udash.rest.raw.HttpErrorException
+
 class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI with RestAPIUtils {
   def name = syncResponse {
     (userAuth.login, userAuth.fullName)
@@ -16,5 +18,15 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
     Presence.reportUser(userAuth.login)
     Presence.listUsers
   }
+
+  def setLocationName(login: String, name: String) = syncResponse {
+    // check last ip address for the user
+    Presence.getUserIpAddress(login).map { ipAddress =>
+      Locations.nameLocation(ipAddress, name)
+      Presence.reportUser(userAuth.login)
+      Presence.listUsers
+    }.getOrElse(throw HttpErrorException(500, "User presence not found"))
+  }
+
 
 }

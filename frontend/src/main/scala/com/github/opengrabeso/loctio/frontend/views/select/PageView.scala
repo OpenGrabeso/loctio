@@ -5,12 +5,16 @@ package select
 
 import java.time.{Duration, ZonedDateTime}
 
-
 import com.github.opengrabeso.loctio.dataModel.SettingsModel
 import common.css._
 import io.udash._
+import io.udash.bootstrap.button.UdashButton
+import io.udash.bootstrap.dropdown.UdashDropdown
+import io.udash.bootstrap.modal.UdashModal
+import io.udash.bootstrap.utils.BootstrapStyles._
 import io.udash.bootstrap.table.UdashTable
 import io.udash.css._
+import io.udash.rest.raw.HttpErrorException
 import scalatags.JsDom.all._
 
 class PageView(
@@ -38,6 +42,56 @@ class PageView(
     )
   }
 
+  val setLocationUser = Property[String]("")
+  val setLocationAddr = Property[String]("")
+  val setLocationLocation = Property[String]("")
+  val locationOkButton = UdashButton(Color.Success.toProperty)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "OK"))
+  buttonOnClick(locationOkButton) {
+    presenter.setLocationName(setLocationUser.get, setLocationLocation.get)
+  }
+  val setLocationModal = UdashModal(Some(Size.Small).toProperty)(
+    headerFactory = Some(_ => div("Set location name (", bind(setLocationUser), ")").render),
+    bodyFactory = Some { nested =>
+      div(
+        Spacing.margin(),
+        Card.card, Card.body, Background.color(Color.Light),
+      )(
+        bind(setLocationAddr),
+        TextInput(setLocationLocation)()
+      ).render
+    },
+    footerFactory = Some { _ =>
+      div(
+        locationOkButton.render,
+        UdashButton(Color.Danger.toProperty)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "Cancel")).render
+      ).render
+    }
+  )
+
+  private def locationRealNameOnly(s: String): String = {
+    val IpAddr = "[0-9]+\\.[0-9.]+]".r
+    s match {
+      case IpAddr() =>
+        ""
+      case _ =>
+        s
+    }
+  }
+  def userDropDown(ar: UserRow) = {
+    val callback = () => {
+      setLocationUser.set(ar.login)
+      setLocationAddr.set(ar.location)
+      setLocationLocation.set(locationRealNameOnly(ar.location))
+      setLocationModal.show()
+    }
+    val items = SeqProperty[UdashDropdown.DefaultDropdownItem](Seq(
+      UdashDropdown.DefaultDropdownItem.Button("Name location", callback),
+    ))
+
+    val dropdown = UdashDropdown.default(items)(_ => Seq[Modifier]("", Button.color(Color.Primary)))
+    dropdown.render
+  }
+
   def getTemplate: Modifier = {
 
 
@@ -48,6 +102,7 @@ class PageView(
       TableFactory.TableAttrib("User", (ar, _, _) => ar.login.render),
       TableFactory.TableAttrib("Location", (ar, _, _) => ar.location.render),
       TableFactory.TableAttrib("Last seen", (ar, _, _) => formatDateTime(ar.lastTime.toJSDate).render),
+      TableFactory.TableAttrib("", (ar, _, _) => userDropDown(ar)),
     )
 
     val table = UdashTable(model.subSeq(_.users), striped = true.toProperty, bordered = true.toProperty, hover = true.toProperty, small = true.toProperty)(
@@ -55,13 +110,21 @@ class PageView(
       rowFactory = TableFactory.rowFactory(attribs)
     )
 
+    def getErrorText(ex: Throwable) = ex match {
+      case he: HttpErrorException =>
+        s"HTTP Error ${he.code}"
+      case _ =>
+        ex.toString
+    }
+
     div(
       s.container,
+      setLocationModal,
       div(
         showIfElse(model.subProp(_.loading))(
           p("Loading...").render,
           div(
-            bind(model.subProp(_.error).transform(_.map(ex => s"Error loading activities ${ex.toString}").orNull)),
+            bind(model.subProp(_.error).transform(_.map(ex => s"Error ${getErrorText(ex)}").orNull)),
             table.render
           ).render
         )
