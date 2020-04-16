@@ -90,14 +90,10 @@ class PageView(
       setLocationLocation.set(locationRealNameOnly(ar.location))
       setLocationModal.show()
     }
-    def toggleInvisible(): Unit = {
-      model.subProp(_.invisible).set(!model.subProp(_.invisible).get)
-      presenter.refreshUsers()
-    }
     val itemSeq = if (ar.login == model.subModel(_.settings).subProp(_.login).get) {
       Seq(
         UdashDropdown.DefaultDropdownItem.Button("Name location", callback),
-        UdashDropdown.DefaultDropdownItem.Button("Toggle invisible", toggleInvisible),
+        UdashDropdown.DefaultDropdownItem.Button("Toggle invisible", () => presenter.toggleInvisible()),
       )
     } else {
       Seq(

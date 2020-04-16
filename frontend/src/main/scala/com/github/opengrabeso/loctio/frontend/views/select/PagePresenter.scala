@@ -30,11 +30,10 @@ class PagePresenter(
   rpc: RestAPI
 )(implicit ec: ExecutionContext) extends Headers.PagePresenter[SelectPageState.type](application) {
 
-  def props: ModelProperty[SettingsModel] = model.subModel(_.settings)
-  def properties = props
+  private def properties: ModelProperty[SettingsModel] = model.subModel(_.settings)
 
-  private def currentToken: String = props.subProp(_.token).get
-  private def currentLogin: String = props.subProp(_.login).get
+  private def currentToken: String = properties.subProp(_.token).get
+  private def currentLogin: String = properties.subProp(_.login).get
 
   private val publicIp = Property[String]("")
 
@@ -128,7 +127,7 @@ class PagePresenter(
     // otherwise both handlers are called, which makes things confusing
     val loaded = SettingsModel.load
     println(s"Loaded props $loaded")
-    props.set(loaded)
+    properties.set(loaded)
   }
 
 
@@ -139,7 +138,7 @@ class PagePresenter(
           model.subProp(_.loading).set(false)
           model.subProp(_.users).set(value.map { u =>
             if (u._1 == currentLogin) {
-              val currentUserState = if (model.subProp(_.invisible).get) "invisible" else u._2.state
+              val currentUserState = if (properties.subProp(_.invisible).get) "invisible" else u._2.state
               UserRow(u._1, u._2.location, u._2.lastSeen, currentUserState)
             } else {
               UserRow(u._1, u._2.location, u._2.lastSeen, u._2.state)
@@ -154,7 +153,7 @@ class PagePresenter(
   }
 
   def refreshUsers(token: String, ipAddress: String): Unit = {
-    val invisible = model.subProp(_.invisible).get
+    val invisible = properties.subProp(_.invisible).get
     val sinceLastActiveMin = (System.currentTimeMillis() - lastActive) / 60000
 
     val state = if (invisible) "offline" else if (sinceLastActiveMin < 5) "online" else "away"
@@ -168,6 +167,12 @@ class PagePresenter(
   def setLocationName(login: String, location: String): Unit = {
     val token = currentToken
     userAPI.setLocationName(login, location).onComplete(loadUsersCallback(token, _))
+  }
+
+  def toggleInvisible(): Unit = {
+    properties.subProp(_.invisible).set(!properties.subProp(_.invisible).get)
+    SettingsModel.store(properties.get)
+    refreshUsers()
   }
 
 
