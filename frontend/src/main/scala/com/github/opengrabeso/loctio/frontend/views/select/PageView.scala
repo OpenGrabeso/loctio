@@ -21,7 +21,7 @@ class PageView(
   model: ModelProperty[PageModel],
   presenter: PagePresenter,
   globals: ModelProperty[SettingsModel]
-) extends FinalView with CssView with PageUtils with TimeFormatting {
+) extends Headers.PageView(globals, presenter) with FinalView with CssView with PageUtils with TimeFormatting {
   val s = SelectPageStyles
 
 
@@ -102,7 +102,6 @@ class PageView(
 
   def getTemplate: Modifier = {
 
-
     // value is a callback
     type DisplayAttrib = TableFactory.TableAttrib[UserRow]
     val attribs = Seq[DisplayAttrib](
@@ -126,17 +125,24 @@ class PageView(
     }
 
     div(
-      s.container,
-      setLocationModal,
+      prefix,
+      header,
       div(
-        showIfElse(model.subProp(_.loading))(
-          p("Loading...").render,
+        div( // this will have a border
+          s.container,
+          setLocationModal,
           div(
-            bind(model.subProp(_.error).transform(_.map(ex => s"Error ${getErrorText(ex)}").orNull)),
-            table.render
-          ).render
-        )
-      )
+            showIfElse(model.subProp(_.loading))(
+              p("Loading...").render,
+              div(
+                bind(model.subProp(_.error).transform(_.map(ex => s"Error ${getErrorText(ex)}").orNull)),
+                table.render
+              ).render
+            )
+          )
+        ),
+      ),
+      footer
     )
   }
 }

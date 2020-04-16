@@ -19,7 +19,7 @@ class PagePresenter(
   model: ModelProperty[PageModel],
   application: Application[RoutingState],
   userService: services.UserContextService
-)(implicit ec: ExecutionContext) extends Presenter[SelectPageState.type] {
+)(implicit ec: ExecutionContext) extends Headers.PagePresenter[SelectPageState.type](application) {
 
   def props: ModelProperty[SettingsModel] = userService.properties
   private def currentToken: String = props.subProp(_.token).get
