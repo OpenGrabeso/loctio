@@ -21,14 +21,6 @@ object Presence {
     store(FullName("state", login), info)
   }
 
-  def reportUser(login: String): Unit = {
-    val fullName = FullName("state", login)
-    for (current <- load[PresenceInfo](fullName)) {
-      val now = ZonedDateTime.now().withZoneSameInstant(ZoneOffset.UTC)
-      store(fullName, current.copy(lastSeen = now, state = "online"))
-    }
-  }
-
   def getUserIpAddress(login: String): Option[String] = {
     load[PresenceInfo](FullName("state", login)).map(_.ipAddress)
   }

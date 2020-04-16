@@ -16,11 +16,8 @@ trait UserRestAPI {
   @GET
   def name: Future[(String, String)]
 
-  @PUT
-  def report(ipAddress: String, state: String): Future[Unit]
-
-  @GET
-  def listUsers: Future[Seq[(String, LocationInfo)]]
+  @POST
+  def listUsers(ipAddress: String, state: String): Future[Seq[(String, LocationInfo)]]
 
   @PUT
   def setLocationName(login: String, location: String): Future[Seq[(String, LocationInfo)]]

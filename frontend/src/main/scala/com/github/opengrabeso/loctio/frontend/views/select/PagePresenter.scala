@@ -34,6 +34,8 @@ class PagePresenter(
 
   private def currentToken: String = props.subProp(_.token).get
 
+  private val publicIp = Property[String]("")
+
   var userData: Promise[UserContextData] = _
 
   private val publicIpAddress = Promise[String]()
@@ -74,9 +76,10 @@ class PagePresenter(
 
         for {
           context <- loginFor.future
-          publicIp <- publicIpAddress.future
+          ip <- publicIpAddress.future
         } {
-          rpc.user(context.token).report(publicIp, "online")
+          publicIp.set(ip)
+          startListening()
         }
 
       case Failure(ex) =>
@@ -91,53 +94,61 @@ class PagePresenter(
 
   var interval = Option.empty[SetIntervalHandle]
 
+  // must be called once both login and public IP address are known
+  def startListening(): Unit = {
+    val token = currentToken
+    val ipAddress = publicIp.get
+    assert(token.nonEmpty)
+    assert(ipAddress.nonEmpty)
+
+    refreshUsers(token, ipAddress)
+
+    interval.foreach(clearInterval)
+    interval = Some(setInterval(60000) { // once per minute
+
+      // check if we are active or not
+      // when not, do not report anything
+
+      refreshUsers(token, ipAddress)
+    })
+  }
+
   def init(): Unit = {
     // load the settings before installing the handler
     // otherwise both handlers are called, which makes things confusing
-    println("Loading props")
-    props.listen { p =>
-      loadUsers(p.token)
-      interval.foreach(clearInterval)
-      interval = Some(setInterval(60000) { // once per minute
-
-        // check if we are active or not
-        // when not, do not report anything
-
-        refreshUsers()
-      })
-    }
     val loaded = SettingsModel.load
     println(s"Loaded props $loaded")
     props.set(loaded)
   }
 
 
-  def loadUsersCallback(res: Try[Seq[(String, LocationInfo)]]) = res match {
-    case Success(value) =>
-      model.subProp(_.users).set(value.map { u =>
-        UserRow(u._1, u._2.location, u._2.lastSeen, u._2.state)
-      })
-      model.subProp(_.loading).set(false)
-    case Failure(exception) =>
-      model.subProp(_.error).set(Some(exception))
-      model.subProp(_.loading).set(false)
+  def loadUsersCallback(token: String, res: Try[Seq[(String, LocationInfo)]]) = {
+    if (token == currentToken) { // ignore responses for a previous user (might be pending while the user is changed)
+      res match {
+        case Success(value) =>
+          model.subProp(_.loading).set(false)
+          model.subProp(_.users).set(value.map { u =>
+            UserRow(u._1, u._2.location, u._2.lastSeen, u._2.state)
+          })
+          model.subProp(_.loading).set(false)
+        case Failure(exception) =>
+          model.subProp(_.error).set(Some(exception))
+          model.subProp(_.loading).set(false)
+      }
+    }
   }
 
-  private def doLoadUsers(token: String) = {
-    rpc.user(token).listUsers.onComplete(loadUsersCallback)
-  }
-  def loadUsers(token: String) = {
-    model.subProp(_.loading).set(true)
-    model.subProp(_.users).set(Nil)
-    doLoadUsers(token)
+  private def doLoadUsers(token: String, ipAddress: String, state: String) = {
+    rpc.user(token).listUsers(ipAddress, state).onComplete(loadUsersCallback(token, _))
   }
 
-  def refreshUsers() = {
-    doLoadUsers(currentToken)
+  def refreshUsers(token: String, ipAddress: String) = {
+    doLoadUsers(token, ipAddress, "online")
   }
 
   def setLocationName(login: String, location: String): Unit = {
-    userAPI.setLocationName(login, location).onComplete(loadUsersCallback)
+    val token = currentToken
+    userAPI.setLocationName(login, location).onComplete(loadUsersCallback(token, _))
   }
 
 
