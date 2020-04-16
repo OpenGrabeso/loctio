@@ -133,10 +133,23 @@ class PagePresenter(
 
   def loadUsersCallback(token: String, res: Try[Seq[(String, LocationInfo)]]) = {
     if (token == currentToken) { // ignore responses for a previous user (might be pending while the user is changed)
+      val currentUser = currentLogin
       res match {
         case Success(value) =>
+          def userLowerThan(a: (String, LocationInfo), b: (String, LocationInfo)): Boolean = {
+            def userGroup(a: (String, LocationInfo)) = {
+              if (a._1 == currentUser) 0 // current user first
+              else if (a._2.state != "offline") 1 // all other users
+              else 2 // offline goes last
+            }
+            val aLevel = userGroup(a)
+            val bLevel = userGroup(b)
+            if (aLevel < bLevel) true
+            else if (aLevel == bLevel) a._1 < b._1 // sort alphabetically in the same group
+            else false
+          }
           model.subProp(_.loading).set(false)
-          model.subProp(_.users).set(value.map { u =>
+          model.subProp(_.users).set(value.sortWith(userLowerThan).map { u =>
             if (u._1 == currentLogin) {
               val currentUserState = if (properties.subProp(_.invisible).get) "invisible" else u._2.state
               UserRow(u._1, u._2.location, u._2.lastSeen, currentUserState)
