@@ -29,7 +29,11 @@ object Presence {
     val items = enumerate("state/")
     items.map(i => i._2 -> load[PresenceInfo](i._1)).flatMap { case (login, data) =>
       // we need to transfer the time as UTC, otherwise the JS client is unable to decode it
-      data.map(d => login -> LocationInfo(Locations.locationFromIpAddress(d.ipAddress), d.lastSeen.withZoneSameInstant(ZoneOffset.UTC), d.state))
+      data.map { d =>
+        val lastSeen = d.lastSeen.withZoneSameInstant(ZoneOffset.UTC)
+        println(s"Report $login as $d")
+        login -> LocationInfo(Locations.locationFromIpAddress(d.ipAddress), lastSeen, d.state)
+      }
     }
   }.toSeq
 }

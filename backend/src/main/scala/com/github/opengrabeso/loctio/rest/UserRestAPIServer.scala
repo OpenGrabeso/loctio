@@ -6,7 +6,7 @@ import io.udash.rest.raw.HttpErrorException
 class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI with RestAPIUtils {
   private def checkState(state: String) = {
     state match {
-      case "online" | "offline" | "busy" | "away" =>
+      case "online" | "offline" | "busy" | "away" | "invisible" =>
       case _ =>
         throw HttpErrorException(400, s"Unknown state $state")
     }
@@ -38,16 +38,15 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
   def listUsers(ipAddress: String, state: String) = syncResponse {
     checkState(state)
     checkIpAddress(ipAddress)
-    if (state != "away") {
-      // when the user is away, do not update his presence
+    // when the user is away or invisible, do not update his presence
+    if (state != "away" && state != "invisible") {
       if (state == "offline") {
         // when going offline, report only when we were not offline yet
-        // this is important esp. for invisible, which will continue calling listUsers
+        // beware: the same user may use several clients at the same time
         if (Presence.getUser(userAuth.login).forall(_.state != "offline")) {
           Presence.reportUser(userAuth.login, ipAddress, state)
         }
-      }
-      else {
+      } else {
         Presence.reportUser(userAuth.login, ipAddress, state)
       }
     }

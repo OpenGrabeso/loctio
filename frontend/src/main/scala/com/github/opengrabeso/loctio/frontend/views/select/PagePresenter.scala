@@ -156,7 +156,7 @@ class PagePresenter(
     val invisible = properties.subProp(_.invisible).get
     val sinceLastActiveMin = (System.currentTimeMillis() - lastActive) / 60000
 
-    val state = if (invisible) "offline" else if (sinceLastActiveMin < 5) "online" else "away"
+    val state = if (invisible) "invisible" else if (sinceLastActiveMin < 5) "online" else "away"
     rpc.user(token).listUsers(ipAddress, state).onComplete(loadUsersCallback(token, _))
   }
 
