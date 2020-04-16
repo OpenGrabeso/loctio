@@ -2,6 +2,7 @@ package com.github.opengrabeso.loctio
 package frontend
 package views.select
 
+import com.github.opengrabeso.loctio.frontend.views.PageModel
 import routing._
 import io.udash._
 

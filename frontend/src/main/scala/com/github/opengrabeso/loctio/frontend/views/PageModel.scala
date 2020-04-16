@@ -1,11 +1,7 @@
-package com.github.opengrabeso.loctio
-package frontend
-package views
-package select
+package com.github.opengrabeso.loctio.frontend.views
 
+import com.github.opengrabeso.loctio.frontend.views.select.UserRow
 import io.udash._
-import common.model._
-import io.udash.utils.FileUploader.FileUploadModel
 
 /** The form's model structure. */
 case class PageModel(loading: Boolean, users: Seq[UserRow] = Seq.empty, error: Option[Throwable] = None)
