@@ -17,7 +17,7 @@ object RestAPIServer extends RestAPI with RestAPIUtils {
 
   def user(token: String): UserRestAPI = {
     // TODO: check token revocation
-    val logging = true
+    val logging = false
     if (logging) println(s"Try userAPI for token $token")
     val fullName = common.FileStore.FullName("login", token)
     val auth = Storage.load[GitHubAuthResult](fullName).map { a =>

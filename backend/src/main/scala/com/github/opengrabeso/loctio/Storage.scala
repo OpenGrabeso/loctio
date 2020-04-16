@@ -48,7 +48,7 @@ object Storage extends common.FileStore {
   }
 
   def store(name: FullName, obj: AnyRef, metadata: (String, String)*) = {
-    println(s"store '$name'")
+    //println(s"store '$name'")
     val os = output(name, metadata)
     val oos = new ObjectOutputStream(os)
     oos.writeObject(obj)

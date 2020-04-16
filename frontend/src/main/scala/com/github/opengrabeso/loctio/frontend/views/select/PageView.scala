@@ -5,7 +5,6 @@ package select
 
 import java.time.{Duration, ZonedDateTime}
 
-import com.github.opengrabeso.loctio.dataModel.SettingsModel
 import common.css._
 import io.udash._
 import io.udash.bootstrap.button.UdashButton
@@ -19,26 +18,33 @@ import scalatags.JsDom.all._
 
 class PageView(
   model: ModelProperty[PageModel],
-  presenter: PagePresenter,
-  globals: ModelProperty[SettingsModel]
-) extends FinalView with CssView with PageUtils with TimeFormatting {
+  presenter: PagePresenter
+) extends Headers.PageView(model, presenter) with FinalView with CssView with PageUtils with TimeFormatting {
   val s = SelectPageStyles
 
 
-  def getUserStatusIcon(time: ZonedDateTime) = {
-    val now = ZonedDateTime.now()
-    val age = Duration.between(time, now).toMinutes
-    val state = if (age < 10) {
-      "online"
-    } else if (age < 60) {
-      "away"
-    } else {
-      "offline"
+  def getUserStatusIcon(state: String, time: ZonedDateTime) = {
+    val displayState = state match {
+      case  "online" | "busy" =>
+        val now = ZonedDateTime.now()
+        val age = Duration.between(time, now).toMinutes
+        if (age < 5) {
+          state
+        } else if (age < 60) {
+          "away"
+        } else {
+          "offline"
+        }
+      case _ =>
+        // if user is reported as offline, do not check if the user was active recently
+        // as we got a positive notification about going offline
+        // note: invisible user is reporting offline as well
+        state
     }
 
     img(
       s.stateIcon,
-      src := "static/user-" + state + ".ico",
+      src := "static/user-" + displayState + ".ico",
     )
   }
 
@@ -78,15 +84,25 @@ class PageView(
     }
   }
   def userDropDown(ar: UserRow) = {
-    val callback = () => {
+    def callback(): Unit = {
       setLocationUser.set(ar.login)
       setLocationAddr.set(ar.location)
       setLocationLocation.set(locationRealNameOnly(ar.location))
       setLocationModal.show()
     }
-    val items = SeqProperty[UdashDropdown.DefaultDropdownItem](Seq(
-      UdashDropdown.DefaultDropdownItem.Button("Name location", callback),
-    ))
+
+    // change of login will force the table to be created again
+    // transformToSeq binding is currently not needed, as change of invisibility will re-create the table
+    // but it is nicer that way (and the re-creation might no longer happen in future)
+    val items = model.subModel(_.settings).subProp(_.invisible).transformToSeq { invisible =>
+      val current = ar.login == model.subModel(_.settings).subProp(_.login).get
+      val base = Seq(
+        UdashDropdown.DefaultDropdownItem.Button("Name location", callback),
+      )
+      if (current) base ++ Seq(
+        UdashDropdown.DefaultDropdownItem.Button(if (invisible) "Make visible" else "Make invisible", () => presenter.toggleInvisible()),
+      ) else base
+    }
 
     val dropdown = UdashDropdown.default(items)(_ => Seq[Modifier]("", Button.color(Color.Primary)))
     dropdown.render
@@ -94,11 +110,10 @@ class PageView(
 
   def getTemplate: Modifier = {
 
-
     // value is a callback
     type DisplayAttrib = TableFactory.TableAttrib[UserRow]
     val attribs = Seq[DisplayAttrib](
-      TableFactory.TableAttrib("", (ar, _, _) => Seq[Modifier](s.statusTd, getUserStatusIcon(ar.lastTime).render)),
+      TableFactory.TableAttrib("", (ar, _, _) => Seq[Modifier](s.statusTd, getUserStatusIcon(ar.lastState, ar.lastTime).render)),
       TableFactory.TableAttrib("User", (ar, _, _) => ar.login.render),
       TableFactory.TableAttrib("Location", (ar, _, _) => ar.location.render),
       TableFactory.TableAttrib("Last seen", (ar, _, _) => formatDateTime(ar.lastTime.toJSDate).render),
@@ -118,17 +133,28 @@ class PageView(
     }
 
     div(
-      s.container,
-      setLocationModal,
+      prefix,
+      header,
       div(
-        showIfElse(model.subProp(_.loading))(
-          p("Loading...").render,
+        div( // this will have a border
+          s.container,
           div(
-            bind(model.subProp(_.error).transform(_.map(ex => s"Error ${getErrorText(ex)}").orNull)),
-            table.render
-          ).render
-        )
-      )
+            bind(model.subProp(_.debug)),
+            showIfElse(model.subProp(_.loading))(
+              p("Loading...").render,
+              div(
+                bind(model.subProp(_.error).transform(_.map(ex => s"Error ${getErrorText(ex)}").orNull)),
+                table.render
+              ).render
+            )
+          )
+        ),
+      ),
+      div(
+        s.hideModals,
+        setLocationModal,
+      ),
+      footer
     )
   }
 }

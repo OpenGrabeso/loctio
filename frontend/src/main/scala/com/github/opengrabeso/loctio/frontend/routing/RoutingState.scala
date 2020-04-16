@@ -10,16 +10,9 @@ import io.udash._
 -  [RoutingRegistryDef]
   */
 
-sealed abstract class RoutingState(val parentState: Option[ContainerRoutingState]) extends State {
+sealed abstract class RoutingState() extends State {
   override type HierarchyRoot = RoutingState
+  def parentState = None
 }
 
-sealed abstract class ContainerRoutingState(parentState: Option[ContainerRoutingState])
-  extends RoutingState(parentState) with ContainerState
-
-sealed abstract class FinalRoutingState(parentState: Option[ContainerRoutingState])
-  extends RoutingState(parentState) with FinalState
-
-case object RootState extends ContainerRoutingState(None)
-case object SettingsPageState extends FinalRoutingState(Some(RootState))
-case object SelectPageState extends FinalRoutingState(Some(RootState))
+case object SelectPageState extends RoutingState()
