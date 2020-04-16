@@ -50,7 +50,7 @@ object Headers {
       }
     )
 
-    private val settingsButton = button("Settings".toProperty)
+    private val settingsButton = button("Log in".toProperty)
 
     buttonOnClick(settingsButton) {
       settingsToken.set("")
@@ -91,7 +91,7 @@ object Headers {
                       }
                     ))),
                     tr(td(
-                      "User:",
+                      "User: ",
                       produce(userId) { s =>
                         a(href := s"https://www.github.com/$s", bind(name)).render
                       }
