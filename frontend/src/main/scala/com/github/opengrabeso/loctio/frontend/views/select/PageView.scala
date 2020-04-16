@@ -90,18 +90,19 @@ class PageView(
       setLocationLocation.set(locationRealNameOnly(ar.location))
       setLocationModal.show()
     }
-    val itemSeq = if (ar.login == model.subModel(_.settings).subProp(_.login).get) {
-      Seq(
-        UdashDropdown.DefaultDropdownItem.Button("Name location", callback),
-        UdashDropdown.DefaultDropdownItem.Button("Toggle invisible", () => presenter.toggleInvisible()),
-      )
-    } else {
-      Seq(
-        UdashDropdown.DefaultDropdownItem.Button("Name location", callback),
-      )
-    }
 
-    val items = SeqProperty[UdashDropdown.DefaultDropdownItem](itemSeq)
+    // change of login will force the table to be created again
+    // transformToSeq binding is currently not needed, as change of invisibility will re-create the table
+    // but it is nicer that way (and the re-creation might no longer happen in future)
+    val items = model.subModel(_.settings).subProp(_.invisible).transformToSeq { invisible =>
+      val current = ar.login == model.subModel(_.settings).subProp(_.login).get
+      val base = Seq(
+        UdashDropdown.DefaultDropdownItem.Button("Name location", callback),
+      )
+      if (current) base ++ Seq(
+        UdashDropdown.DefaultDropdownItem.Button(if (invisible) "Make visible" else "Make invisible", () => presenter.toggleInvisible()),
+      ) else base
+    }
 
     val dropdown = UdashDropdown.default(items)(_ => Seq[Modifier]("", Button.color(Color.Primary)))
     dropdown.render
