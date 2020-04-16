@@ -4,9 +4,11 @@ package rest
 import java.time.ZonedDateTime
 
 import com.avsystem.commons.meta.MacroInstances
+import com.avsystem.commons.rpc.AsRaw
 import com.avsystem.commons.serialization.{GenCodec, GenKeyCodec, HasGenCodecWithDeps}
 import io.udash.rest._
 import io.udash.rest.openapi.{RestSchema, RestStructure}
+import io.udash.rest.raw.HttpBody
 
 trait EnhancedRestImplicits extends DefaultRestImplicits {
   import EnhancedRestImplicits._
@@ -28,6 +30,8 @@ abstract class EnhancedRestDataCompanion[T](
   implicit val instances: MacroInstances[DefaultRestImplicits, CodecWithStructure[T]] = implicitly[MacroInstances[DefaultRestImplicits, CodecWithStructure[T]]]
   implicit lazy val restStructure: RestStructure[T] = instances(DefaultRestImplicits, this).structure
   implicit lazy val restSchema: RestSchema[T] = RestSchema.lazySchema(restStructure.standaloneSchema)
+
+
 }
 
 

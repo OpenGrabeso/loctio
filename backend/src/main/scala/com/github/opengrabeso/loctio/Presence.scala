@@ -31,7 +31,7 @@ object Presence {
       // we need to transfer the time as UTC, otherwise the JS client is unable to decode it
       data.map { d =>
         val lastSeen = d.lastSeen.withZoneSameInstant(ZoneOffset.UTC)
-        println(s"Report $login as $d")
+        //println(s"Report $login as $d")
         login -> LocationInfo(Locations.locationFromIpAddress(d.ipAddress), lastSeen, d.state)
       }
     }

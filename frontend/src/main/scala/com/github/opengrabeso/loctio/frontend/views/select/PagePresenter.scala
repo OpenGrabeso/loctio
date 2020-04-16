@@ -3,7 +3,7 @@ package frontend
 package views
 package select
 
-import rest.RestAPI
+import rest.{RestAPI, UserRestAPI}
 import com.github.opengrabeso.loctio.dataModel.SettingsModel
 import com.softwaremill.sttp.{dom => _, _}
 import common.model._
@@ -13,6 +13,7 @@ import io.udash.wrappers.jquery.jQ
 import org.scalajs.dom
 
 import scala.concurrent.{ExecutionContext, Promise}
+import scala.scalajs.js
 import scala.scalajs.js.timers._
 import scala.util.{Failure, Success, Try}
 
@@ -104,6 +105,9 @@ class PagePresenter(
     assert(ipAddress.nonEmpty)
 
     lastActive = System.currentTimeMillis()
+
+    //userAPI.shutdown(UserRestAPI.RestString("test"))
+
     refreshUsers(token, ipAddress)
 
     interval.foreach(clearInterval)
@@ -120,6 +124,15 @@ class PagePresenter(
       lastActive = System.currentTimeMillis()
       //model.subProp(_.debug).set(s"Last active at $lastActive")
     })
+
+    // register the shutdown handler (beacon)
+    val debugBeacon = false
+    def onUnload() = dom.window.navigator.asInstanceOf[js.Dynamic].sendBeacon(s"/rest/user/$token/shutdown", "now")
+    if (debugBeacon) {
+      jQ(onUnload())
+    } else {
+      jQ(dom.window).on("unload", (_, _) => onUnload())
+    }
   }
 
   def init(): Unit = {

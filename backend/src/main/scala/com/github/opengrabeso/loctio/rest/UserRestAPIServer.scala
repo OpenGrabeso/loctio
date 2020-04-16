@@ -4,6 +4,8 @@ package rest
 import io.udash.rest.raw.HttpErrorException
 
 class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI with RestAPIUtils {
+  import UserRestAPI._
+
   private def checkState(state: String) = {
     state match {
       case "online" | "offline" | "busy" | "away" | "invisible" =>
@@ -62,5 +64,14 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
     }.getOrElse(throw HttpErrorException(500, "User presence not found"))
   }
 
+  def shutdown(data: RestString) = syncResponse {
+    println(s"Received ${userAuth.login} shutdown $data")
+    // value other then now can be used for testing and debugging the protocol
+    if (data.value == "now") {
+      Presence.getUser(userAuth.login).filter(_.state != "offline").foreach { p =>
+        Presence.reportUser(userAuth.login, p.ipAddress, "offline")
+      }
+    }
+  }
 
 }
