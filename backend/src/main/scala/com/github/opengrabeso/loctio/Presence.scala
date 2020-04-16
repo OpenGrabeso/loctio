@@ -8,35 +8,36 @@ import common.model._
 import common.FileStore.FullName
 
 object Presence {
-  @SerialVersionUID(10L)
+  @SerialVersionUID(20L)
   case class PresenceInfo(
     ipAddress: String,
-    lastSeen: ZonedDateTime
+    lastSeen: ZonedDateTime,
+    state: String
   ) extends Serializable
 
-  def reportUser(login: String, ipAddress: String): Unit = {
+  def reportUser(login: String, ipAddress: String, state: String): Unit = {
     val now = ZonedDateTime.now().withZoneSameInstant(ZoneOffset.UTC)
-    val info = PresenceInfo(ipAddress, now)
-    store(FullName("presence", login), info)
+    val info = PresenceInfo(ipAddress, now, state)
+    store(FullName("state", login), info)
   }
 
   def reportUser(login: String): Unit = {
-    val fullName = FullName("presence", login)
+    val fullName = FullName("state", login)
     for (current <- load[PresenceInfo](fullName)) {
       val now = ZonedDateTime.now().withZoneSameInstant(ZoneOffset.UTC)
-      store(fullName, current.copy(lastSeen = now))
+      store(fullName, current.copy(lastSeen = now, state = "online"))
     }
   }
 
   def getUserIpAddress(login: String): Option[String] = {
-    load[PresenceInfo](FullName("presence", login)).map(_.ipAddress)
+    load[PresenceInfo](FullName("state", login)).map(_.ipAddress)
   }
 
   def listUsers: Seq[(String, LocationInfo)] = {
-    val items = enumerate("presence/")
+    val items = enumerate("state/")
     items.map(i => i._2 -> load[PresenceInfo](i._1)).flatMap { case (login, data) =>
       // we need to transfer the time as UTC, otherwise the JS client is unable to decode it
-      data.map(d => login -> LocationInfo(Locations.locationFromIpAddress(d.ipAddress), d.lastSeen.withZoneSameInstant(ZoneOffset.UTC)))
+      data.map(d => login -> LocationInfo(Locations.locationFromIpAddress(d.ipAddress), d.lastSeen.withZoneSameInstant(ZoneOffset.UTC), d.state))
     }
   }.toSeq
 }

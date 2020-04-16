@@ -58,7 +58,7 @@ class UserContextService(val rpc: rest.RestAPI)(implicit ec: ExecutionContext) {
           context <- loginFor.future
           publicIp <- publicIpAddress.future
         } {
-          rpc.user(context.token).report(publicIp)
+          rpc.user(context.token).report(publicIp, "online")
         }
 
       case Failure(ex) =>

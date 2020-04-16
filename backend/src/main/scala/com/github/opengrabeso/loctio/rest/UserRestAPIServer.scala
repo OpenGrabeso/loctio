@@ -8,8 +8,8 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
     (userAuth.login, userAuth.fullName)
   }
 
-  def report(ipAddress: String) = syncResponse {
-    Presence.reportUser(userAuth.login, ipAddress)
+  def report(ipAddress: String, state: String) = syncResponse {
+    Presence.reportUser(userAuth.login, ipAddress, state)
   }
 
   def listUsers = syncResponse {

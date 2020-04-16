@@ -25,20 +25,28 @@ class PageView(
   val s = SelectPageStyles
 
 
-  def getUserStatusIcon(time: ZonedDateTime) = {
-    val now = ZonedDateTime.now()
-    val age = Duration.between(time, now).toMinutes
-    val state = if (age < 10) {
-      "online"
-    } else if (age < 60) {
-      "away"
-    } else {
-      "offline"
+  def getUserStatusIcon(state: String, time: ZonedDateTime) = {
+    val displayState = state match {
+      case  "online" | "busy" =>
+        val now = ZonedDateTime.now()
+        val age = Duration.between(time, now).toMinutes
+        if (age < 10) {
+          state
+        } else if (age < 60) {
+          "away"
+        } else {
+          "offline"
+        }
+      case _ =>
+        // if user is reported as offline, do not check if the user was active recently
+        // as we got a positive notification about going offline
+        // note: invisible user is reporting offline as well
+        state
     }
 
     img(
       s.stateIcon,
-      src := "static/user-" + state + ".ico",
+      src := "static/user-" + displayState + ".ico",
     )
   }
 
@@ -98,7 +106,7 @@ class PageView(
     // value is a callback
     type DisplayAttrib = TableFactory.TableAttrib[UserRow]
     val attribs = Seq[DisplayAttrib](
-      TableFactory.TableAttrib("", (ar, _, _) => Seq[Modifier](s.statusTd, getUserStatusIcon(ar.lastTime).render)),
+      TableFactory.TableAttrib("", (ar, _, _) => Seq[Modifier](s.statusTd, getUserStatusIcon(ar.lastState, ar.lastTime).render)),
       TableFactory.TableAttrib("User", (ar, _, _) => ar.login.render),
       TableFactory.TableAttrib("Location", (ar, _, _) => ar.location.render),
       TableFactory.TableAttrib("Last seen", (ar, _, _) => formatDateTime(ar.lastTime.toJSDate).render),
