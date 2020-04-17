@@ -14,21 +14,12 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
     }
   }
 
-  private def checkLoginName(name: String) = {
-    val Valid = "[a-z\\d](?:[a-z\\d]|-(?=[a-z\\d])){0,38}".r // see https://github.com/shinnn/github-username-regex
-    name match {
-      case Valid() =>
-      case _ =>
-        throw HttpErrorException(400, s"Invalid user name $name")
-    }
-  }
-
   private def checkIpAddress(addr: String) = {
     val Valid = "[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+".r
     addr match {
       case Valid() =>
       case _ =>
-        throw HttpErrorException(400, s"Invalid user name $name")
+        throw HttpErrorException(400, s"Invalid IP address $name")
     }
   }
 
@@ -56,7 +47,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
   }
 
   def setLocationName(login: String, name: String) = syncResponse {
-    checkLoginName(name)
+    // no need to sanitize login name, it is used only to query the file
     // check last ip address for the user
     Presence.getUser(login).map { presence =>
       Locations.nameLocation(presence.ipAddress, name)
