@@ -292,6 +292,7 @@ object Start extends SimpleSwingApplication {
     title = appName
 
     val panel = new Label()
+    panel.font = panel.font.deriveFont(panel.font.getSize2D * 1.2f)
 
     val columns = Seq("", "User", "Location", "Last seen")
     contents = new ScrollPane(
@@ -326,7 +327,6 @@ object Start extends SimpleSwingApplication {
             <style>
             table {
               border-collapse: collapse;
-              font-size: 24px;
             }
             table {
               border: 1px none #ff0000;
