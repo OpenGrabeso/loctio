@@ -89,6 +89,8 @@ lazy val trayUtil = (project in file("tray-util"))
     name := "LoctioStart",
     commonSettings,
     libraryDependencies += "com.typesafe.akka" %% "akka-http" % "10.0.9",
+    libraryDependencies += "com.twelvemonkeys.imageio" % "imageio-bmp" % "3.5",
+    libraryDependencies += "org.scala-lang.modules" %% "scala-swing" % "2.1.1",
     libraryDependencies ++= commonLibs ++ jvmLibs,
     assemblyMergeStrategy in assembly := {
       case x if x.contains("io.netty.versions.properties") => MergeStrategy.discard

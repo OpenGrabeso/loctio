@@ -103,7 +103,7 @@ object Start extends App {
 
         val tray = SystemTray.getSystemTray
         val iconSize = tray.getTrayIconSize
-        val imageFile = if ((iconSize.height max iconSize.width) > 16) "/stravaUpload32.png" else "/stravaUpload16.png"
+        val imageFile = if ((iconSize.height max iconSize.width) > 16) "/user-online.ico" else "/user-online.ico"
         val is = getClass.getResourceAsStream(imageFile)
 
         val image = ImageIO.read(is)
