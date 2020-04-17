@@ -289,9 +289,9 @@ object Start extends SimpleSwingApplication {
 
     title = appName
 
-    val panel = new GridPanel(0, 4)
+    val panel = new Label()
 
-    val columns = Seq("", "User", "Location", "Last seen").map(new Label(_))
+    val columns = Seq("", "User", "Location", "Last seen")
     contents = new ScrollPane(
       new BoxPanel(Orientation.Vertical) {
         contents += panel
@@ -299,42 +299,41 @@ object Start extends SimpleSwingApplication {
     )
 
     def setUsers(us: Seq[(String, LocationInfo)]): this.type = {
-      panel.contents.clear()
-      panel.contents ++= columns ++ us.flatMap { case (name, loc) =>
-        Seq(
-          loc.state,
-          name,
-          //language=HTML
-          s"""<html>
-              <head>
-              <style>
-              table {
-                border-collapse: collapse;
-              }
-              table, th, td {
-                border: 1px dotted #ff0000;
-              }
-              th, td {
-                border: 1px solid #ffc080;
-              }
-              td.boo {
-                color:blue;
-                background:#eeffee;
-                border: 3px dashed green;
-              }
-              </style>
-              </head>
-              <body>
-                <table>
-                <tr><td>${loc.location}</td></tr>
-                <tr><td class="boo">${loc.location}</td></tr>
-                </table>
-              </body>
-             </html>
-          """,
-          loc.lastSeen.toString
-        ).map(new Label(_))
-      } ++ columns.map(_ => VGlue)
+
+      def userRow(name: String, loc: LocationInfo) = {
+        //language=HTML
+        s"""<tr>
+           <td>${loc.state}</td>
+           <td>$name</td>
+           <td>${loc.location}</td>
+           <td>${loc.lastSeen}</td>
+           </tr>
+          """
+      }
+
+      panel.text = //language=HTML
+        s"""<html>
+            <head>
+            <style>
+            table {
+              border-collapse: collapse;
+            }
+            table {
+              border: 1px none #ff0000;
+            }
+            th, td {
+              border: 1px solid #e0e0e0;
+            }
+            </style>
+            </head>
+            <body>
+              <table>
+              <tr>${columns.map(c => s"<th>$c</th>").mkString}</tr>
+              ${us.map{case (name, loc) => userRow(name, loc)}.mkString}
+              </table>
+            </body>
+           </html>
+        """
       pack()
       this
     }
