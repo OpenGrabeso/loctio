@@ -9,10 +9,11 @@ import akka.stream.ActorMaterializer
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Promise, duration}
+import scala.swing._
 import scala.util.{Success, Try}
 
 
-object Start extends App {
+object Start extends SimpleSwingApplication {
 
   case class AuthData(userId: String, since: ZonedDateTime, sessionId: String, authCode: String)
 
@@ -214,11 +215,22 @@ object Start extends App {
     icon.foreach(Tray.changeState(_, message))
   }
 
-  // wait until user ends the application
+  override def top = new MainFrame {
+    title = "Loctio"
 
-  Await.result(exitEvent.future, Duration.Inf)
+    contents = new FlowPanel {
+      contents += new Label("Presence and location utility:")
+      contents += new Button("Click me") {
+        reactions += {
+          case event.ButtonClicked(_) =>
+            println("All the colours!")
+            Start.icon.foreach(Tray.remove)
+        }
+      }
+    }
 
-  icon.foreach(Tray.remove)
-  // force stop - some threads seem to be preventing this and I am unable to find why
-  System.exit(0)
+    pack()
+    centerOnScreen()
+    open()
+  }
 }
