@@ -285,14 +285,18 @@ object Start extends SimpleSwingApplication {
   }
 
   object mainFrame extends Frame {
+    assert(SwingUtilities.isEventDispatchThread)
+
     title = appName
 
     val panel = new GridPanel(0, 4)
 
     val columns = Seq("", "User", "Location", "Last seen").map(new Label(_))
-    contents = new FlowPanel {
-      contents += panel
-    }
+    contents = new ScrollPane(
+      new BoxPanel(Orientation.Vertical) {
+        contents += panel
+      }
+    )
 
     def setUsers(us: Seq[(String, LocationInfo)]): this.type = {
       panel.contents.clear()
@@ -330,7 +334,7 @@ object Start extends SimpleSwingApplication {
           """,
           loc.lastSeen.toString
         ).map(new Label(_))
-      }
+      } ++ columns.map(_ => VGlue)
       pack()
       this
     }
@@ -397,7 +401,9 @@ object Start extends SimpleSwingApplication {
   }
 
   if (cfg.token.nonEmpty) {
-    performLogin(cfg.token)
+    OnSwing.future {
+      performLogin(cfg.token)
+    }
   }
 
   private val publicIpAddress = PublicIpAddress.get(global)
