@@ -3,9 +3,7 @@ package com.github.opengrabeso.loctio
 import java.time.ZonedDateTime
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model._
-import akka.stream.ActorMaterializer
+import rest.RestAPIClient
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future, Promise, duration}
@@ -17,13 +15,13 @@ object Start extends SimpleSwingApplication {
   case class AuthData(userId: String, since: ZonedDateTime, sessionId: String, authCode: String)
 
   implicit val system = ActorSystem()
-  implicit val materializer = ActorMaterializer()
 
   val exitEvent = Promise[Boolean]()
 
   trait ServerUsed {
     def url: String
     def description: String
+    override def toString = url
   }
   // GAE local server
   object ServerLocal8080 extends ServerUsed {
@@ -52,17 +50,17 @@ object Start extends SimpleSwingApplication {
       if (!serverFound.tryComplete(Success(confirmed))) {
         // we always use only the first server confirmed
         // a developer should not run both
-        println("Warning: it seems there are two local servers running")
+        println(s"Warning: we are already connected to ${serverFound.future.value.flatMap(_.toOption).getOrElse("None")}")
       }
     }
 
     def tryLocalServer(s: ServerUsed) = {
-      Http().singleRequest(HttpRequest(uri = s.url + "/identity")).map(_.discardEntityBytes()).map(_ => localServerConfirmed(s))
+      RestAPIClient.fromUrl(s.url).identity("ping").foreach(_ => localServerConfirmed(s))
     }
 
     if (localTest) {
-      tryLocalServer(ServerLocal8080)
       tryLocalServer(ServerLocal4567)
+      tryLocalServer(ServerLocal8080)
     }
 
     system.scheduler.scheduleOnce(Duration(2000, duration.MILLISECONDS)) {
