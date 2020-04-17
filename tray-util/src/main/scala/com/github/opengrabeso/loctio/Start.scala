@@ -1,6 +1,8 @@
 package com.github.opengrabeso.loctio
 
 import java.time.ZonedDateTime
+import java.time.format._
+import java.util.Locale
 
 import akka.actor.{ActorSystem, Cancellable}
 import com.github.opengrabeso.loctio.common.PublicIpAddress
@@ -299,6 +301,13 @@ object Start extends SimpleSwingApplication {
     )
 
     def setUsers(us: Seq[(String, LocationInfo)]): this.type = {
+      val loc = Locale.getDefault(Locale.Category.FORMAT)
+      val style = FormatStyle.SHORT
+      val fmt = DateTimeFormatter.ofLocalizedDateTime(style).withLocale(loc)
+
+      def displayTime(t: ZonedDateTime) = {
+        fmt.format(t)
+      }
 
       def userRow(name: String, loc: LocationInfo) = {
         //language=HTML
@@ -306,7 +315,7 @@ object Start extends SimpleSwingApplication {
            <td>${loc.state}</td>
            <td>$name</td>
            <td>${loc.location}</td>
-           <td>${loc.lastSeen}</td>
+           <td>${displayTime(loc.lastSeen)}</td>
            </tr>
           """
       }
@@ -317,6 +326,7 @@ object Start extends SimpleSwingApplication {
             <style>
             table {
               border-collapse: collapse;
+              font-size: 24px;
             }
             table {
               border: 1px none #ff0000;
