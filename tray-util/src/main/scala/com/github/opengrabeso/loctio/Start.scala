@@ -72,11 +72,34 @@ object Start extends SimpleSwingApplication {
     serverFound.future
   }
 
-  def login() = {
+  def login(location: Point) = {
+  }
 
+  // make sure frame is on screen
+  def placeFrame(frame: Frame, location: Point) = {
+    val config = frame.peer.getGraphicsConfiguration
+    val bounds = config.getBounds
+    val insets = java.awt.Toolkit.getDefaultToolkit.getScreenInsets(config)
+
+    val minX = bounds.x + insets.left
+    val minY = bounds.y + insets.top
+    val maxX = bounds.x + bounds.width - insets.right - frame.size.width
+    val maxY = bounds.y + bounds.height - insets.bottom - frame.size.height
+
+    val loc = new Point(minX max location.x min maxX, minY max location.y min maxY)
+    frame.location = loc
+  }
+
+  def openWindow(location: Point): Unit = {
+    mainFrame.foreach { frame =>
+      // place the window a bit above the mouse - this avoid conflicting with the menu
+      placeFrame(frame, new Point(location.x, location.y - frame.size.height - frame.preferredSize.height * 2))
+      frame.open
+    }
   }
 
   def appExit() = {
+    println("appExit")
     icon.foreach(Tray.remove)
 
     System.exit(0)
@@ -117,30 +140,46 @@ object Start extends SimpleSwingApplication {
 
         val popup = new JPopupMenu
 
-        def addItem(title: String, action: => Unit) = {
-          val listener = new ActionListener() {
-            def actionPerformed(e: ActionEvent) = action
-          }
+        def addItem(title: String, action: Point => Unit) = {
           val item = new JMenuItem(title)
+          object listener extends ComponentAdapter with ActionListener {
+            var location: Point = _
+
+            override def componentShown(e: ComponentEvent) = location = e.getComponent.getLocation()
+
+            def actionPerformed(e: ActionEvent) = {
+              val loc = Option(location).getOrElse(MouseInfo.getPointerInfo.getLocation)
+              action(loc)
+            }
+          }
+          popup.getComponent.addComponentListener(listener)
           item.addActionListener(listener)
           popup.add(item)
         }
 
-        addItem("Login...", login())
+        addItem("Open...", openWindow)
         popup.addSeparator()
-        addItem("Exit", appExit())
+        addItem("Login...", login)
+        popup.addSeparator()
+        addItem("Exit", _ => appExit())
 
+        def showPopup(e: MouseEvent) = {
+          popup.setLocation(e.getX, e.getY)
+          popup.setInvoker(popup)
+          popup.setVisible(true)
+        }
 
         trayIcon addMouseListener new MouseAdapter {
+
+          override def mouseClicked(e: MouseEvent) = if (e.getClickCount > 1) openWindow(new Point(e.getPoint)) // note: any button double click opens the window
+
           override def mouseReleased(e: MouseEvent) = maybeShowPopup(e)
 
           override def mousePressed(e: MouseEvent) = maybeShowPopup(e)
 
-          def maybeShowPopup(e: MouseEvent) = {
+          private def maybeShowPopup(e: MouseEvent) = {
             if (e.isPopupTrigger) {
-              popup.setLocation(e.getX, e.getY)
-              popup.setInvoker(popup)
-              popup.setVisible(true)
+              showPopup(e)
             }
           }
         }
@@ -210,13 +249,14 @@ object Start extends SimpleSwingApplication {
   }
 
   val icon = Tray.show()
+  var mainFrame = Option.empty[Frame]
 
   def reportTray(message: String): Unit = {
     icon.foreach(Tray.changeState(_, message))
   }
 
-  override def top = new MainFrame {
-    title = "Loctio"
+  override def top = new Frame {
+    title = appName
 
 
     contents = new FlowPanel {
@@ -224,14 +264,19 @@ object Start extends SimpleSwingApplication {
       contents += new Button("Click me") {
         reactions += {
           case event.ButtonClicked(_) =>
-            println("All the colours!")
-            Start.icon.foreach(Tray.remove)
+            println("Clicked")
         }
       }
     }
-
-    pack()
-    centerOnScreen()
-    open()
+    peer.setDefaultCloseOperation(javax.swing.WindowConstants.HIDE_ON_CLOSE)
   }
+
+  // override, we do not want to show the window when started
+  override def startup(args: Array[String]): Unit = {
+    val t = top
+    if (t.size == new Dimension(0,0)) t.pack()
+    mainFrame = Some(t)
+    //t.open()
+  }
+
 }
