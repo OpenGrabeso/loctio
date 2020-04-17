@@ -3,12 +3,15 @@ package com.github.opengrabeso.loctio
 import java.time.ZonedDateTime
 
 import akka.actor.ActorSystem
-import rest.RestAPIClient
+import rest.{RestAPI, RestAPIClient}
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future, Promise, duration}
 import scala.swing._
 import scala.util.Success
+import scala.swing.Swing._
+import shared.ChainingSyntax._
+import scala.concurrent.ExecutionContext.Implicits.global
 
 object Start extends SimpleSwingApplication {
 
@@ -18,10 +21,15 @@ object Start extends SimpleSwingApplication {
 
   val exitEvent = Promise[Boolean]()
 
+  private var cfg = Config.load
+  private var loginName = Option.empty[Future[String]]
+
   trait ServerUsed {
     def url: String
     def description: String
     override def toString = url
+
+    val api: RestAPI = RestAPIClient.fromUrl(url)
   }
   // GAE local server
   object ServerLocal8080 extends ServerUsed {
@@ -55,7 +63,7 @@ object Start extends SimpleSwingApplication {
     }
 
     def tryLocalServer(s: ServerUsed) = {
-      RestAPIClient.fromUrl(s.url).identity("ping").foreach(_ => localServerConfirmed(s))
+      s.api.identity("ping").foreach(_ => localServerConfirmed(s))
     }
 
     if (localTest) {
@@ -71,6 +79,13 @@ object Start extends SimpleSwingApplication {
   }
 
   def login(location: Point) = {
+    val frame = loginFrame
+    placeFrameAbove(frame, location)
+    frame.open()
+  }
+
+  def performLogin(token: String): Unit = {
+    loginName = Some(server.flatMap(_.api.user(token).name).map(_._1).tap(_.onComplete(s => println(s"Login done $s"))))
   }
 
   // make sure frame is on screen
@@ -88,10 +103,14 @@ object Start extends SimpleSwingApplication {
     frame.location = loc
   }
 
+  def placeFrameAbove(frame: Frame, location: Point) = {
+    placeFrame(frame, new Point(location.x, location.y - frame.size.height - frame.preferredSize.height * 2))
+  }
+
   def openWindow(location: Point): Unit = {
     mainFrame.foreach { frame =>
       // place the window a bit above the mouse - this avoid conflicting with the menu
-      placeFrame(frame, new Point(location.x, location.y - frame.size.height - frame.preferredSize.height * 2))
+      placeFrameAbove(frame, location)
       frame.open
     }
   }
@@ -256,17 +275,50 @@ object Start extends SimpleSwingApplication {
   override def top = new Frame {
     title = appName
 
-
     contents = new FlowPanel {
       contents += new Label("Presence and location utility:")
-      contents += new Button("Click me") {
-        reactions += {
-          case event.ButtonClicked(_) =>
-            println("Clicked")
+    }
+  }
+
+  object loginFrame extends Frame { dialog =>
+    title = appName
+    private val tokenField = new TextField("")
+    contents = new BoxPanel(Orientation.Vertical) {
+      for {
+        n <- loginName
+        v <- n.value
+      } {
+        contents += new BoxPanel(Orientation.Horizontal) {
+          contents += new Label(s"Currently logged in as $v")
+        }
+      }
+      contents += new BoxPanel(Orientation.Horizontal) {
+        contents += new Label("Enter your GitHub token (no scopes necessary):")
+      }
+      contents += new BoxPanel(Orientation.Horizontal) {
+        contents += tokenField.tap(_.columns = 40)
+      }
+      contents += new BoxPanel(Orientation.Horizontal) {
+        contents += HGlue
+        contents += new Button("OK") {
+          reactions += {
+            case event.ButtonClicked(_) =>
+              if (tokenField.text.nonEmpty) {
+                cfg = cfg.copy(token = tokenField.text)
+                Config.store(cfg)
+                performLogin(cfg.token)
+              }
+              dialog.close()
+          }
+        }
+        contents += new Button("Cancel") {
+          reactions += {
+            case event.ButtonClicked(_) =>
+              dialog.close()
+          }
         }
       }
     }
-    peer.setDefaultCloseOperation(javax.swing.WindowConstants.HIDE_ON_CLOSE)
   }
 
   // override, we do not want to show the window when started
@@ -277,4 +329,5 @@ object Start extends SimpleSwingApplication {
     //t.open()
   }
 
+  performLogin(cfg.token)
 }
