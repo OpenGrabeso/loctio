@@ -8,10 +8,9 @@ import akka.http.scaladsl.model._
 import akka.stream.ActorMaterializer
 
 import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Promise, duration}
+import scala.concurrent.{Await, Future, Promise, duration}
 import scala.swing._
-import scala.util.{Success, Try}
-
+import scala.util.Success
 
 object Start extends SimpleSwingApplication {
 
@@ -24,33 +23,33 @@ object Start extends SimpleSwingApplication {
 
   trait ServerUsed {
     def url: String
-    def desciption: String
+    def description: String
   }
   // GAE local server
   object ServerLocal8080 extends ServerUsed {
     def url = "http://localhost:8080"
-    def desciption = " to local server"
+    def description = " to local server"
   }
   // Jetty embedded server
   object ServerLocal4567 extends ServerUsed {
     def url = "http://localhost:4567"
-    def desciption = " to local Jetty server"
+    def description = " to local Jetty server"
   }
   // production server
   object ServerProduction extends ServerUsed {
     def url = "https://loctio.appspot.com"
-    override def desciption = ""
+    override def description = ""
   }
 
-  val server: ServerUsed = {
+  val server: Future[ServerUsed] = {
     import scala.concurrent.ExecutionContext.Implicits.global
 
     val localTest = true // disabling the local test would make uploads faster for used of the production build (no need to wait for the probe timeout)
-    val localFound = Promise[ServerUsed]()
+    val serverFound = Promise[ServerUsed]()
 
     def localServerConfirmed(confirmed: ServerUsed): Unit = synchronized {
       println(s"Confirmed local server ${confirmed.url}")
-      if (!localFound.tryComplete(Success(confirmed))) {
+      if (!serverFound.tryComplete(Success(confirmed))) {
         // we always use only the first server confirmed
         // a developer should not run both
         println("Warning: it seems there are two local servers running")
@@ -66,11 +65,12 @@ object Start extends SimpleSwingApplication {
       tryLocalServer(ServerLocal4567)
     }
 
-    // try communicating with the local Loctio, if not responding, use the remote one
-    Try(Await.result(localFound.future, Duration(2000, duration.MILLISECONDS))).getOrElse(ServerProduction)
-  }
+    system.scheduler.scheduleOnce(Duration(2000, duration.MILLISECONDS)) {
+      serverFound.trySuccess(ServerProduction)
+    }
 
-  private val loctiotUrl = server.url
+    serverFound.future
+  }
 
   def login() = {
 
@@ -217,6 +217,7 @@ object Start extends SimpleSwingApplication {
 
   override def top = new MainFrame {
     title = "Loctio"
+
 
     contents = new FlowPanel {
       contents += new Label("Presence and location utility:")
