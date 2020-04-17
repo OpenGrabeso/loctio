@@ -2,11 +2,10 @@ package com.github.opengrabeso.loctio
 
 import java.time.ZonedDateTime
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorSystem, Cancellable}
 import com.github.opengrabeso.loctio.common.PublicIpAddress
 import com.github.opengrabeso.loctio.common.model.LocationInfo
-import javax.swing.event.TableModelListener
-import javax.swing.table.{AbstractTableModel, TableModel}
+import javax.swing.SwingUtilities
 import rest.{RestAPI, RestAPIClient}
 
 import scala.concurrent.duration.Duration
@@ -19,20 +18,16 @@ import shared.ChainingSyntax._
 import scala.concurrent.ExecutionContext.global
 import shared.FutureAt._
 
-import scala.collection.mutable
-import scala.collection.parallel.immutable
-
 object Start extends SimpleSwingApplication {
-
-  // consider sharing with frontend (Udash) frontend.views.select
-  case class UserRow(login: String, location: String, lastTime: ZonedDateTime, lastState: String)
 
   implicit val system = ActorSystem()
 
   val exitEvent = Promise[Boolean]()
 
   private var cfg = Config.load
-  private var loginName = Option.empty[Future[String]]
+  private var loginName = ""
+  private var usersReady = false
+  private var updateSchedule: Cancellable = _
 
   trait ServerUsed {
     def url: String
@@ -88,16 +83,39 @@ object Start extends SimpleSwingApplication {
     serverFound.future
   }
 
-  def userApi: Future[rest.UserRestAPI] = server.at(global).map(_.api.user(cfg.token))
+  def userApi: Future[rest.UserRestAPI] = if (cfg.token.nonEmpty) {
+    server.at(global).map(_.api.user(cfg.token))
+  } else {
+    Future.failed(throw new NoSuchElementException("No token provided"))
+  }
 
   def login(location: Point) = {
+    assert(SwingUtilities.isEventDispatchThread)
     val frame = loginFrame
     placeFrameAbove(frame, location)
+    frame.init()
     frame.open()
   }
 
   def performLogin(token: String): Unit = {
-    loginName = Some(server.at(global).flatMap(_.api.user(token).name).at(global).map(_._1).tap(_.at(global).onComplete(s => println(s"Login done $s"))))
+    usersReady = false
+    loginName = ""
+    mainFrame.setUsers(Seq.empty)
+    server.at(global).flatMap(_.api.user(token).name).at(global).map(_._1).at(OnSwing).foreach { s =>
+      loginName = s
+      println(s"Login done $s")
+      // request users regularly
+      if (updateSchedule != null) updateSchedule.cancel()
+      updateSchedule = system.scheduler.schedule(Duration(0, duration.MINUTES), Duration(1, duration.MINUTES)){
+        requestUsers.at(OnSwing).foreach { users =>
+          if (token == cfg.token) { // ignore any pending futures with a different token
+            usersReady = true
+            mainFrame.setUsers(users)
+            println("User list ready")
+          }
+        }
+      }(global)
+    }
   }
 
   // make sure frame is on screen
@@ -122,7 +140,7 @@ object Start extends SimpleSwingApplication {
   def openWindow(location: Point): Unit = {
     // place the window a bit above the mouse - this avoid conflicting with the menu
     placeFrameAbove(mainFrame, location)
-    usersReady.future.at(OnSwing).foreach {_ =>
+    if (usersReady) {
       mainFrame.open()
     }
   }
@@ -167,7 +185,7 @@ object Start extends SimpleSwingApplication {
 
         val popup = new JPopupMenu
 
-        def addItem(title: String, action: Point => Unit) = {
+        def addItem(title: String, action: Point => Unit): JMenuItem = {
           val item = new JMenuItem(title)
           object listener extends ActionListener {
             def actionPerformed(e: ActionEvent) = {
@@ -176,15 +194,17 @@ object Start extends SimpleSwingApplication {
           }
           item.addActionListener(listener)
           popup.add(item)
+          item
         }
 
-        addItem("Open...", openWindow)
+        val openItem = addItem("Open...", openWindow)
         popup.addSeparator()
         addItem("Login...", login)
         popup.addSeparator()
         addItem("Exit", _ => appExit())
 
         def showPopup(e: MouseEvent) = {
+          openItem.setEnabled(usersReady)
           popup.setLocation(e.getX, e.getY)
           popup.setInvoker(popup)
           popup.setVisible(true)
@@ -267,8 +287,6 @@ object Start extends SimpleSwingApplication {
   object mainFrame extends Frame {
     title = appName
 
-    var users = Vector.empty[UserRow]
-
     val panel = new GridPanel(0, 4)
 
     val columns = Seq("", "User", "Location", "Last seen").map(new Label(_))
@@ -322,16 +340,25 @@ object Start extends SimpleSwingApplication {
   override def top = mainFrame
 
   object loginFrame extends Frame { dialog =>
+    assert(SwingUtilities.isEventDispatchThread)
     title = appName
     private val tokenField = new TextField("")
+    private val loginField = new Label("")
+
+    def init(): Unit = {
+      assert(SwingUtilities.isEventDispatchThread)
+      tokenField.text = ""
+      // workaround hack: setting loginField.text directly does not work - no idea why
+      // the text is changed, but the position and the extents (bounding box) is not
+      OnSwing.future {
+        loginField.text = s"Currently logged in as $loginName"
+        pack()
+      }
+    }
+
     contents = new BoxPanel(Orientation.Vertical) {
-      for {
-        n <- loginName
-        v <- n.value
-      } {
-        contents += new BoxPanel(Orientation.Horizontal) {
-          contents += new Label(s"Currently logged in as $v")
-        }
+      contents += new BoxPanel(Orientation.Horizontal) {
+        contents += loginField
       }
       contents += new BoxPanel(Orientation.Horizontal) {
         contents += new Label("Enter your GitHub token (no scopes necessary):")
@@ -369,11 +396,12 @@ object Start extends SimpleSwingApplication {
     //t.open()
   }
 
-  performLogin(cfg.token)
+  if (cfg.token.nonEmpty) {
+    performLogin(cfg.token)
+  }
 
   private val publicIpAddress = PublicIpAddress.get(global)
 
-  val usersReady = Promise[Unit]()
 
   def requestUsers = {
     userApi.at(global).flatMap(api =>
@@ -382,13 +410,5 @@ object Start extends SimpleSwingApplication {
       )
     )
   }
-
-  // request users regularly
-  system.scheduler.schedule(Duration(0, duration.MINUTES), Duration(1, duration.MINUTES)){
-    requestUsers.at(OnSwing).foreach { users =>
-      usersReady.trySuccess(())
-      mainFrame.setUsers(users)
-    }
-  }(global)
 
 }
