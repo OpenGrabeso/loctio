@@ -3,15 +3,18 @@ package com.github.opengrabeso.loctio
 import java.time.ZonedDateTime
 
 import akka.actor.ActorSystem
+import com.github.opengrabeso.loctio.common.PublicIpAddress
 import rest.{RestAPI, RestAPIClient}
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future, Promise, duration}
 import scala.swing._
-import scala.util.Success
+import scala.util.{Failure, Success}
 import scala.swing.Swing._
 import shared.ChainingSyntax._
-import scala.concurrent.ExecutionContext.Implicits.global
+
+import scala.concurrent.ExecutionContext.global
+import shared.FutureAt._
 
 object Start extends SimpleSwingApplication {
 
@@ -78,6 +81,8 @@ object Start extends SimpleSwingApplication {
     serverFound.future
   }
 
+  def userApi: Future[rest.UserRestAPI] = server.at(global).map(_.api.user(cfg.token))
+
   def login(location: Point) = {
     val frame = loginFrame
     placeFrameAbove(frame, location)
@@ -85,7 +90,7 @@ object Start extends SimpleSwingApplication {
   }
 
   def performLogin(token: String): Unit = {
-    loginName = Some(server.flatMap(_.api.user(token).name).map(_._1).tap(_.onComplete(s => println(s"Login done $s"))))
+    loginName = Some(server.at(global).flatMap(_.api.user(token).name).at(global).map(_._1).tap(_.at(global).onComplete(s => println(s"Login done $s"))))
   }
 
   // make sure frame is on screen
@@ -108,11 +113,9 @@ object Start extends SimpleSwingApplication {
   }
 
   def openWindow(location: Point): Unit = {
-    mainFrame.foreach { frame =>
-      // place the window a bit above the mouse - this avoid conflicting with the menu
-      placeFrameAbove(frame, location)
-      frame.open
-    }
+    // place the window a bit above the mouse - this avoid conflicting with the menu
+    placeFrameAbove(mainFrame, location)
+    mainFrame.open
   }
 
   def appExit() = {
@@ -144,13 +147,11 @@ object Start extends SimpleSwingApplication {
 
         val tray = SystemTray.getSystemTray
         val iconSize = tray.getTrayIconSize
-        val imageFile = if ((iconSize.height max iconSize.width) > 16) "/user-online.ico" else "/user-online.ico"
-        val is = getClass.getResourceAsStream(imageFile)
+        val is = getClass.getResourceAsStream("/user-online.ico")
 
         val image = ImageIO.read(is)
+
         val imageSized = image.getScaledInstance(iconSize.width, iconSize.height, Image.SCALE_SMOOTH)
-
-
         val trayIcon = new TrayIcon(imageSized, appName)
 
         import java.awt.event.MouseAdapter
@@ -159,17 +160,11 @@ object Start extends SimpleSwingApplication {
 
         def addItem(title: String, action: Point => Unit) = {
           val item = new JMenuItem(title)
-          object listener extends ComponentAdapter with ActionListener {
-            var location: Point = _
-
-            override def componentShown(e: ComponentEvent) = location = e.getComponent.getLocation()
-
+          object listener extends ActionListener {
             def actionPerformed(e: ActionEvent) = {
-              val loc = Option(location).getOrElse(MouseInfo.getPointerInfo.getLocation)
-              action(loc)
+              action(MouseInfo.getPointerInfo.getLocation)
             }
           }
-          popup.getComponent.addComponentListener(listener)
           item.addActionListener(listener)
           popup.add(item)
         }
@@ -229,11 +224,6 @@ object Start extends SimpleSwingApplication {
       icon.setToolTip(text)
     }
 
-    private def loginDoneImpl(icon: TrayIcon): Unit = {
-      icon.setPopupMenu(null)
-    }
-
-
     def show(): Option[TrayIcon] = {
       val p = Promise[Option[TrayIcon]]
       SwingUtilities.invokeLater(new Runnable {
@@ -252,12 +242,6 @@ object Start extends SimpleSwingApplication {
       }
     }
 
-    def loginDone(icon: TrayIcon): Unit = {
-      SwingUtilities.invokeAndWait(new Runnable {
-        override def run() = loginDoneImpl(icon)
-      })
-    }
-
     def changeState(icon: TrayIcon, s: String): Unit = {
       SwingUtilities.invokeLater(new Runnable {
         override def run() = changeStateImpl(icon, s)
@@ -266,19 +250,21 @@ object Start extends SimpleSwingApplication {
   }
 
   val icon = Tray.show()
-  var mainFrame = Option.empty[Frame]
 
   def reportTray(message: String): Unit = {
     icon.foreach(Tray.changeState(_, message))
   }
 
-  override def top = new Frame {
+  object mainFrame extends Frame {
     title = appName
 
     contents = new FlowPanel {
       contents += new Label("Presence and location utility:")
     }
   }
+
+
+  override def top = mainFrame
 
   object loginFrame extends Frame { dialog =>
     title = appName
@@ -325,9 +311,21 @@ object Start extends SimpleSwingApplication {
   override def startup(args: Array[String]): Unit = {
     val t = top
     if (t.size == new Dimension(0,0)) t.pack()
-    mainFrame = Some(t)
     //t.open()
   }
 
   performLogin(cfg.token)
+
+  private val publicIpAddress = PublicIpAddress.get(global)
+
+  userApi.at(global).foreach(api =>
+    publicIpAddress.at(global).foreach(addr =>
+      api.listUsers(addr, "online").at(OnSwing).foreach { u =>
+        println(u)
+        u
+      }
+    )
+  )
+
+
 }

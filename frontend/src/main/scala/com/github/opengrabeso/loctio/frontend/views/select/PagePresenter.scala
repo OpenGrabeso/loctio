@@ -3,6 +3,7 @@ package frontend
 package views
 package select
 
+import com.github.opengrabeso.loctio.common.PublicIpAddress
 import rest.{RestAPI, UserRestAPI}
 import com.github.opengrabeso.loctio.dataModel.SettingsModel
 import com.softwaremill.sttp.{dom => _, _}
@@ -40,29 +41,7 @@ class PagePresenter(
 
   var userData: Promise[UserContextData] = _
 
-  private val publicIpAddress = Promise[String]()
-
-  private def requestPublicIpAddress(): Unit = {
-    // TODO: we should refresh public address from time to time, it can change (network change, physical computer location change)
-    val request = sttp.get(uri"https://ipinfo.io/ip")
-
-    implicit val backend = FetchBackend()
-    val response = request.send()
-    response.onComplete {
-      case Success(r) =>
-        r.body match {
-          case Right(string) =>
-            println(s"Obtained a public IP address ${string.trim}")
-            publicIpAddress.success(string.trim)
-          case Left(value) =>
-            publicIpAddress.failure(new UnsupportedOperationException(value))
-        }
-      case Failure(ex) =>
-        publicIpAddress.failure(ex)
-    }
-  }
-
-  requestPublicIpAddress()
+  private val publicIpAddress = PublicIpAddress.get(ec)
 
   println(s"Create UserContextService, token ${properties.subProp(_.token).get}")
   properties.subProp(_.token).listen {token =>
@@ -77,8 +56,8 @@ class PagePresenter(
         loginFor.success(UserContextData(r._1, token))
 
         for {
-          context <- loginFor.future
-          ip <- publicIpAddress.future
+          context <- loginFor.future // we need to wait for this before calling startListening
+          ip <- publicIpAddress
         } {
           publicIp.set(ip)
           startListening()
