@@ -4,6 +4,9 @@ import java.time.ZonedDateTime
 
 import akka.actor.ActorSystem
 import com.github.opengrabeso.loctio.common.PublicIpAddress
+import com.github.opengrabeso.loctio.common.model.LocationInfo
+import javax.swing.event.TableModelListener
+import javax.swing.table.{AbstractTableModel, TableModel}
 import rest.{RestAPI, RestAPIClient}
 
 import scala.concurrent.duration.Duration
@@ -16,9 +19,13 @@ import shared.ChainingSyntax._
 import scala.concurrent.ExecutionContext.global
 import shared.FutureAt._
 
+import scala.collection.mutable
+import scala.collection.parallel.immutable
+
 object Start extends SimpleSwingApplication {
 
-  case class AuthData(userId: String, since: ZonedDateTime, sessionId: String, authCode: String)
+  // consider sharing with frontend (Udash) frontend.views.select
+  case class UserRow(login: String, location: String, lastTime: ZonedDateTime, lastState: String)
 
   implicit val system = ActorSystem()
 
@@ -115,7 +122,9 @@ object Start extends SimpleSwingApplication {
   def openWindow(location: Point): Unit = {
     // place the window a bit above the mouse - this avoid conflicting with the menu
     placeFrameAbove(mainFrame, location)
-    mainFrame.open
+    usersReady.future.at(OnSwing).foreach {_ =>
+      mainFrame.open()
+    }
   }
 
   def appExit() = {
@@ -258,8 +267,38 @@ object Start extends SimpleSwingApplication {
   object mainFrame extends Frame {
     title = appName
 
+    val columns = Seq("", "User", "Location", "Last seen")
+    var users = Vector.empty[UserRow]
+
+    implicit class IndexUserRow(row: UserRow) {
+      private val get = IndexedSeq[() => String](
+        () => row.lastState,
+        () => row.login,
+        () => row.location,
+        () => row.lastTime.toString
+      )
+      def apply(index: Int): String = get(index)()
+    }
+
+    object tableModel extends AbstractTableModel {
+      def getRowCount = users.size
+      def getColumnCount = columns.size
+      override def getColumnName(columnIndex: Int) = columns(columnIndex)
+      def getValueAt(rowIndex: Int, columnIndex: Int) = users(rowIndex)(columnIndex)
+    }
+    val table = new Table(tableModel)
+
     contents = new FlowPanel {
       contents += new Label("Presence and location utility:")
+      contents += table
+    }
+
+    def setUsers(us: Seq[(String, LocationInfo)]): this.type = {
+      users = us.map { u =>
+        UserRow(u._1, u._2.location, u._2.lastSeen, u._2.state)
+      }.toVector
+      pack()
+      this
     }
   }
 
@@ -318,14 +357,22 @@ object Start extends SimpleSwingApplication {
 
   private val publicIpAddress = PublicIpAddress.get(global)
 
-  userApi.at(global).foreach(api =>
-    publicIpAddress.at(global).foreach(addr =>
-      api.listUsers(addr, "online").at(OnSwing).foreach { u =>
-        println(u)
-        u
-      }
-    )
-  )
+  val usersReady = Promise[Unit]()
 
+  def requestUsers = {
+    userApi.at(global).flatMap(api =>
+      publicIpAddress.at(global).flatMap(addr =>
+        api.listUsers(addr, "online")
+      )
+    )
+  }
+
+  // request users regularly
+  system.scheduler.schedule(Duration(0, duration.MINUTES), Duration(1, duration.MINUTES)){
+    requestUsers.at(OnSwing).foreach { users =>
+      usersReady.trySuccess(())
+      mainFrame.setUsers(users)
+    }
+  }(global)
 
 }
