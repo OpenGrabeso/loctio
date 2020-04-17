@@ -267,36 +267,52 @@ object Start extends SimpleSwingApplication {
   object mainFrame extends Frame {
     title = appName
 
-    val columns = Seq("", "User", "Location", "Last seen")
     var users = Vector.empty[UserRow]
 
-    implicit class IndexUserRow(row: UserRow) {
-      private val get = IndexedSeq[() => String](
-        () => row.lastState,
-        () => row.login,
-        () => row.location,
-        () => row.lastTime.toString
-      )
-      def apply(index: Int): String = get(index)()
-    }
+    val panel = new GridPanel(0, 4)
 
-    object tableModel extends AbstractTableModel {
-      def getRowCount = users.size
-      def getColumnCount = columns.size
-      override def getColumnName(columnIndex: Int) = columns(columnIndex)
-      def getValueAt(rowIndex: Int, columnIndex: Int) = users(rowIndex)(columnIndex)
-    }
-    val table = new Table(tableModel)
-
+    val columns = Seq("", "User", "Location", "Last seen").map(new Label(_))
     contents = new FlowPanel {
-      contents += new Label("Presence and location utility:")
-      contents += table
+      contents += panel
     }
 
     def setUsers(us: Seq[(String, LocationInfo)]): this.type = {
-      users = us.map { u =>
-        UserRow(u._1, u._2.location, u._2.lastSeen, u._2.state)
-      }.toVector
+      panel.contents.clear()
+      panel.contents ++= columns ++ us.flatMap { case (name, loc) =>
+        Seq(
+          loc.state,
+          name,
+          //language=HTML
+          s"""<html>
+              <head>
+              <style>
+              table {
+                border-collapse: collapse;
+              }
+              table, th, td {
+                border: 1px dotted #ff0000;
+              }
+              th, td {
+                border: 1px solid #ffc080;
+              }
+              td.boo {
+                color:blue;
+                background:#eeffee;
+                border: 3px dashed green;
+              }
+              </style>
+              </head>
+              <body>
+                <table>
+                <tr><td>${loc.location}</td></tr>
+                <tr><td class="boo">${loc.location}</td></tr>
+                </table>
+              </body>
+             </html>
+          """,
+          loc.lastSeen.toString
+        ).map(new Label(_))
+      }
       pack()
       this
     }
