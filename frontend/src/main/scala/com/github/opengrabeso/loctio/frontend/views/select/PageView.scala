@@ -24,24 +24,7 @@ class PageView(
 
 
   def getUserStatusIcon(state: String, time: ZonedDateTime) = {
-    val displayState = state match {
-      case  "online" | "busy" =>
-        val now = ZonedDateTime.now()
-        val age = Duration.between(time, now).toMinutes
-        if (age < 5) {
-          state
-        } else if (age < 60) {
-          "away"
-        } else {
-          "offline"
-        }
-      case _ =>
-        // if user is reported as offline, do not check if the user was active recently
-        // as we got a positive notification about going offline
-        // note: invisible user is reporting offline as well
-        state
-    }
-
+    val displayState = common.UserState.getEffectiveUserStatus(state, time)
     img(
       s.stateIcon,
       src := "static/user-" + displayState + ".ico",

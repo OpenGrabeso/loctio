@@ -313,8 +313,9 @@ object Start extends SimpleSwingApplication {
 
       def userRow(name: String, loc: LocationInfo) = {
         //language=HTML
+        val displayState = common.UserState.getEffectiveUserStatus(loc.state, loc.lastSeen)
         s"""<tr>
-           <td>${loc.state}</td>
+           <td>${displayState}</td>
            <td>$name</td>
            <td>${loc.location}</td>
            <td>${displayTime(loc.lastSeen)}</td>
