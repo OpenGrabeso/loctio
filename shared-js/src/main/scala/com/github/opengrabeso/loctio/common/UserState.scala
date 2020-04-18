@@ -3,6 +3,8 @@ package common
 
 import java.time.{Duration, ZonedDateTime}
 
+import model._
+
 object UserState {
   def getEffectiveUserStatus(state: String, time: ZonedDateTime) = {
     val now = ZonedDateTime.now()
@@ -28,5 +30,30 @@ object UserState {
     displayState
   }
 
+
+  def userTable(currentUser: String, currentUserInvisible: Boolean, value: Seq[(String, LocationInfo)]) = {
+    def userLowerThan(a: UserRow, b: UserRow): Boolean = {
+      def userGroup(a: UserRow) = {
+        if (a.login == currentUser) 0 // current user first
+        else if (a.lastState != "offline") 1 // all other users
+        else 2 // offline goes last
+      }
+      val aLevel = userGroup(a)
+      val bLevel = userGroup(b)
+      if (aLevel < bLevel) true
+      else if (aLevel == bLevel) a.login < b.login // sort alphabetically in the same group
+      else false
+    }
+
+    value.map { u =>
+      if (u._1 == currentUser) {
+        val currentUserState = if (currentUserInvisible) "invisible" else u._2.state
+        UserRow(u._1, u._2.location, u._2.lastSeen, currentUserState)
+      } else {
+        UserRow(u._1, u._2.location, u._2.lastSeen, getEffectiveUserStatus(u._2.state, u._2.lastSeen))
+      }
+    }.sortWith(userLowerThan)
+
+  }
 
 }

@@ -5,6 +5,7 @@ package select
 
 import java.time.{Duration, ZonedDateTime}
 
+import common.model.UserRow
 import common.css._
 import io.udash._
 import io.udash.bootstrap.button.UdashButton

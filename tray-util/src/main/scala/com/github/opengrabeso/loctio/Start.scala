@@ -302,6 +302,8 @@ object Start extends SimpleSwingApplication {
     )
 
     def setUsers(us: Seq[(String, LocationInfo)]): this.type = {
+      val table = common.UserState.userTable(loginName, false, us)
+
       val loc = Locale.getDefault(Locale.Category.FORMAT)
       val style = FormatStyle.MEDIUM
       val fmt = DateTimeFormatter.ofLocalizedDateTime(style).withLocale(loc)
@@ -311,14 +313,13 @@ object Start extends SimpleSwingApplication {
         fmt.format(t.withZoneSameInstant(zone))
       }
 
-      def userRow(name: String, loc: LocationInfo) = {
+      def userRow(row: common.model.UserRow) = {
         //language=HTML
-        val displayState = common.UserState.getEffectiveUserStatus(loc.state, loc.lastSeen)
         s"""<tr>
-           <td>${displayState}</td>
-           <td>$name</td>
-           <td>${loc.location}</td>
-           <td>${displayTime(loc.lastSeen)}</td>
+           <td>${row.lastState}</td>
+           <td>${row.login}</td>
+           <td>${row.location}</td>
+           <td>${displayTime(row.lastTime)}</td>
            </tr>
           """
       }
@@ -341,7 +342,7 @@ object Start extends SimpleSwingApplication {
             <body>
               <table>
               <tr>${columns.map(c => s"<th>$c</th>").mkString}</tr>
-              ${us.map{case (name, loc) => userRow(name, loc)}.mkString}
+              ${table.map{row => userRow(row)}.mkString}
               </table>
             </body>
            </html>
