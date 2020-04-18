@@ -150,8 +150,9 @@ object Start extends SimpleSwingApplication {
   def appExit() = {
     println("appExit")
     icon.foreach(Tray.remove)
-
-    System.exit(0)
+    userApi.at(global).flatMap(_.shutdown(rest.UserRestAPI.RestString("now"))).at(OnSwing).foreach {_ =>
+      System.exit(0)
+    }
   }
 
   private object Tray {
