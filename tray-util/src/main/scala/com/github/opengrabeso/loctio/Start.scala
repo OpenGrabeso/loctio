@@ -1,6 +1,6 @@
 package com.github.opengrabeso.loctio
 
-import java.time.ZonedDateTime
+import java.time.{ZoneId, ZonedDateTime}
 import java.time.format._
 import java.util.Locale
 
@@ -305,9 +305,10 @@ object Start extends SimpleSwingApplication {
       val loc = Locale.getDefault(Locale.Category.FORMAT)
       val style = FormatStyle.MEDIUM
       val fmt = DateTimeFormatter.ofLocalizedDateTime(style).withLocale(loc)
+      val zone = ZoneId.systemDefault()
 
       def displayTime(t: ZonedDateTime) = {
-        fmt.format(t)
+        fmt.format(t.withZoneSameInstant(zone))
       }
 
       def userRow(name: String, loc: LocationInfo) = {
