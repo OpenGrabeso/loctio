@@ -56,7 +56,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
   }
 
   def shutdown(data: RestString) = syncResponse {
-    println(s"Received ${userAuth.login} shutdown $data")
+    println(s"Received ${userAuth.login} shutdown ${data.value}")
     // value other then now can be used for testing and debugging the protocol
     if (data.value == "now") {
       Presence.getUser(userAuth.login).filter(_.state != "offline").foreach { p =>
