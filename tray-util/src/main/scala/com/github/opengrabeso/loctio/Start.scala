@@ -303,7 +303,7 @@ object Start extends SimpleSwingApplication {
 
     def setUsers(us: Seq[(String, LocationInfo)]): this.type = {
       val loc = Locale.getDefault(Locale.Category.FORMAT)
-      val style = FormatStyle.SHORT
+      val style = FormatStyle.MEDIUM
       val fmt = DateTimeFormatter.ofLocalizedDateTime(style).withLocale(loc)
 
       def displayTime(t: ZonedDateTime) = {
