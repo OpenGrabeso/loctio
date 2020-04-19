@@ -1,6 +1,7 @@
 package com.github.opengrabeso.loctio
 package common
 
+import java.time.temporal.ChronoUnit
 import java.time.{Duration, ZonedDateTime}
 
 import model._
@@ -28,6 +29,18 @@ object UserState {
         state
     }
     displayState
+  }
+
+  /*
+   if the time should be displayed complete, we return None, because we are unable to format ZonedTimeTime cross-platform
+   Scala.js requires different functions
+   */
+  def smartTime(t: ZonedDateTime): Option[String] = {
+    val now = ZonedDateTime.now()
+    val since = t.until(now, ChronoUnit.MINUTES)
+    if (since < 10) Some("now")
+    else if (since < 60) Some(s"${since / 10 * 10} min ago")
+    else None
   }
 
 

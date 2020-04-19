@@ -311,7 +311,7 @@ object Start extends SimpleSwingApplication {
       val zone = ZoneId.systemDefault()
 
       def displayTime(t: ZonedDateTime) = {
-        fmt.format(t.withZoneSameInstant(zone))
+        common.UserState.smartTime(t).getOrElse(fmt.format(t.withZoneSameInstant(zone)))
       }
 
       def userStateDisplay(state: String) = {

@@ -100,7 +100,7 @@ class PageView(
       TableFactory.TableAttrib("", (ar, _, _) => Seq[Modifier](s.statusTd, getUserStatusIcon(ar.lastState, ar.lastTime).render)),
       TableFactory.TableAttrib("User", (ar, _, _) => ar.login.render),
       TableFactory.TableAttrib("Location", (ar, _, _) => ar.location.render),
-      TableFactory.TableAttrib("Last seen", (ar, _, _) => formatDateTime(ar.lastTime.toJSDate).render),
+      TableFactory.TableAttrib("Last seen", (ar, _, _) => common.UserState.smartTime(ar.lastTime).getOrElse(formatDateTime(ar.lastTime.toJSDate)).render),
       TableFactory.TableAttrib("", (ar, _, _) => userDropDown(ar)),
     )
 
