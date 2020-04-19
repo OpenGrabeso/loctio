@@ -314,10 +314,21 @@ object Start extends SimpleSwingApplication {
         fmt.format(t.withZoneSameInstant(zone))
       }
 
+      def userStateHtml(state: String) = {
+        // consider using inline images (icons) instead
+        val (color, text) = state match {
+          case "online" => ("green", "⏺")
+          case "offline" => ("gray", "\uD83D\uDF87")  // possible alternatives: 🞅
+          case "away" => ("yellow", "⏺")
+          case "busy" => ("red", "⏺")
+        }
+        //language=HTML
+        s"<span style='color: $color'>$text</span>"
+      }
       def userRow(row: common.model.UserRow) = {
         //language=HTML
         s"""<tr>
-           <td>${row.lastState}</td>
+           <td>${userStateHtml(row.lastState)}</td>
            <td>${row.login}</td>
            <td>${row.location}</td>
            <td>${displayTime(row.lastTime)}</td>
