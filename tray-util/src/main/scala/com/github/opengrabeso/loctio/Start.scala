@@ -2,11 +2,12 @@ package com.github.opengrabeso.loctio
 
 import java.time.{ZoneId, ZonedDateTime}
 import java.time.format._
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 import akka.actor.{ActorSystem, Cancellable}
 import com.github.opengrabeso.loctio.common.PublicIpAddress
-import com.github.opengrabeso.loctio.common.model.LocationInfo
+import com.github.opengrabeso.loctio.common.model.{LocationInfo, UserRow}
 import javax.swing.SwingUtilities
 import rest.{RestAPI, RestAPIClient}
 
@@ -136,7 +137,7 @@ object Start extends SimpleSwingApplication {
   }
 
   def placeFrameAbove(frame: Frame, location: Point) = {
-    placeFrame(frame, new Point(location.x, location.y - frame.size.height - frame.preferredSize.height * 2))
+    placeFrame(frame, new Point(location.x, location.y - frame.size.height - 150))
   }
 
   def openWindow(location: Point): Unit = {
@@ -215,7 +216,7 @@ object Start extends SimpleSwingApplication {
 
         trayIcon addMouseListener new MouseAdapter {
 
-          override def mouseClicked(e: MouseEvent) = if (e.getClickCount > 1) openWindow(new Point(e.getPoint)) // note: any button double click opens the window
+          override def mouseClicked(e: MouseEvent) = if (e.getButton == 1) openWindow(new Point(e.getPoint))
 
           override def mouseReleased(e: MouseEvent) = maybeShowPopup(e)
 
@@ -252,32 +253,32 @@ object Start extends SimpleSwingApplication {
       assert(SwingUtilities.isEventDispatchThread)
       state = s
       val title = appName
-      val text = if (state.isEmpty) title else title + ": " + state
+      val text = if (state.isEmpty) title else state
       icon.setToolTip(text)
     }
 
+    def swingInvokeAndWait[T](callback: => T): T = {
+      if (SwingUtilities.isEventDispatchThread) {
+        callback
+      } else {
+        val p = Promise[T]
+        OnSwing.future(p.success(callback))
+        Await.result(p.future, Duration.Inf)
+      }
+    }
     def show(): Option[TrayIcon] = {
-      val p = Promise[Option[TrayIcon]]
-      SwingUtilities.invokeLater(new Runnable {
-        override def run() = p.success(showImpl())
-      })
-      Await.result(p.future, Duration.Inf)
+      swingInvokeAndWait(showImpl())
     }
 
     def remove(icon: TrayIcon): Unit = {
-      if (SwingUtilities.isEventDispatchThread) {
-        removeImpl(icon)
-      } else {
-        SwingUtilities.invokeAndWait(new Runnable {
-          override def run() = removeImpl(icon)
-        })
-      }
+      // wait to be sure the thread removing the icon is not terminated by exit before the removal is completed
+      swingInvokeAndWait(removeImpl(icon))
     }
 
     def changeState(icon: TrayIcon, s: String): Unit = {
-      SwingUtilities.invokeLater(new Runnable {
-        override def run() = changeStateImpl(icon, s)
-      })
+      OnSwing.future {
+        changeStateImpl(icon, s)
+      }
     }
   }
 
@@ -306,26 +307,29 @@ object Start extends SimpleSwingApplication {
       val table = common.UserState.userTable(loginName, false, us)
 
       val loc = Locale.getDefault(Locale.Category.FORMAT)
-      val style = FormatStyle.MEDIUM
-      val fmt = DateTimeFormatter.ofLocalizedDateTime(style).withLocale(loc)
+      val fmt = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT).withLocale(loc)
       val zone = ZoneId.systemDefault()
 
       def displayTime(t: ZonedDateTime) = {
         fmt.format(t.withZoneSameInstant(zone))
       }
 
+      def userStateDisplay(state: String) = {
+        state match { // from https://www.alt-codes.net/circle-symbols
+          case "online" => ("green", "⚫")
+          case "offline" => ("gray", "⦾")
+          case "away" => ("yellow", "⦿")
+          case "busy" => ("red", "⚫")
+        }
+      }
+
       def userStateHtml(state: String) = {
         // consider using inline images (icons) instead
-        val (color, text) = state match {
-          case "online" => ("green", "⏺")
-          case "offline" => ("gray", "\uD83D\uDF87")  // possible alternatives: 🞅
-          case "away" => ("yellow", "⏺")
-          case "busy" => ("red", "⏺")
-        }
-        //language=HTML
+        val (color, text) = userStateDisplay(state)
         s"<span style='color: $color'>$text</span>"
       }
-      def userRow(row: common.model.UserRow) = {
+
+      def userRowHTML(row: common.model.UserRow) = {
         //language=HTML
         s"""<tr>
            <td>${userStateHtml(row.lastState)}</td>
@@ -336,7 +340,8 @@ object Start extends SimpleSwingApplication {
           """
       }
 
-      panel.text = //language=HTML
+
+      val tableHTML = //language=HTML
         s"""<html>
             <head>
             <style>
@@ -354,12 +359,24 @@ object Start extends SimpleSwingApplication {
             <body>
               <table>
               <tr>${columns.map(c => s"<th>$c</th>").mkString}</tr>
-              ${table.map{row => userRow(row)}.mkString}
+              ${table.map(userRowHTML).mkString}
               </table>
             </body>
            </html>
         """
+      panel.text = tableHTML
       pack()
+      def trayUserLine(u: UserRow) = {
+        val stateText = userStateDisplay(u.lastState)._2
+        if (u.lastState != "offline") {
+          s"$stateText ${u.login}: ${u.location}"
+        } else {
+          s"$stateText ${u.login}: ${displayTime(u.lastTime)}"
+        }
+      }
+      val onlineUsers = table.filter(u => u.login != loginName && u.lastTime.until(ZonedDateTime.now(), ChronoUnit.DAYS) < 7)
+      val statusText = onlineUsers.map(u => trayUserLine(u)).mkString("\n")
+      reportTray(statusText)
       this
     }
   }
