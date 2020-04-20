@@ -116,7 +116,6 @@ object Start extends SimpleSwingApplication {
           if (token == cfg.token) { // ignore any pending futures with a different token
             usersReady = true
             mainFrame.setUsers(users)
-            println("User list ready")
           }
         }
       }(global)
