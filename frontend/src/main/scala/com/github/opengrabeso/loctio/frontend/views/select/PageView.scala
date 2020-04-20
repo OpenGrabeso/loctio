@@ -97,10 +97,13 @@ class PageView(
     // value is a callback
     type DisplayAttrib = TableFactory.TableAttrib[UserRow]
     val attribs = Seq[DisplayAttrib](
-      TableFactory.TableAttrib("", (ar, _, _) => Seq[Modifier](s.statusTd, getUserStatusIcon(ar.lastState, ar.lastTime).render)),
+      TableFactory.TableAttrib("", (ar, _, _) => Seq[Modifier](s.statusTd, getUserStatusIcon(ar.currentState, ar.lastTime).render)),
       TableFactory.TableAttrib("User", (ar, _, _) => ar.login.render),
       TableFactory.TableAttrib("Location", (ar, _, _) => ar.location.render),
-      TableFactory.TableAttrib("Last seen", (ar, _, _) => common.UserState.smartTime(ar.lastTime).getOrElse(formatDateTime(ar.lastTime.toJSDate)).render),
+      TableFactory.TableAttrib(
+        "Last seen",
+        (ar, _, _) => if (ar.currentState != "online") common.UserState.smartTime(ar.lastTime, formatTime, formatDate, formatDayOfWeek).render else ""
+      ),
       TableFactory.TableAttrib("", (ar, _, _) => userDropDown(ar)),
     )
 

@@ -32,15 +32,24 @@ object UserState {
   }
 
   /*
-   if the time should be displayed complete, we return None, because we are unable to format ZonedTimeTime cross-platform
-   Scala.js requires different functions
+   we expect platform specific callbacks to format time components - ZonedTimeTime formatting not supported on Scala.js
    */
-  def smartTime(t: ZonedDateTime): Option[String] = {
+  def smartTime(
+    t: ZonedDateTime, formatTime: ZonedDateTime => String,
+    formatDate: ZonedDateTime => String,
+    formatDayOfWeek: ZonedDateTime => String
+  ): String = {
     val now = ZonedDateTime.now()
     val since = t.until(now, ChronoUnit.MINUTES)
-    if (since < 10) Some("now")
-    else if (since < 60) Some(s"${since / 10 * 10} min ago")
-    else None
+    val daysSince = ChronoUnit.DAYS.between(t, now)
+    if (since < 10) "5 min ago"
+    else if (since < 60) s"${since / 10 * 10} min ago"
+    else if (daysSince == 0) formatTime(t)
+    else if (daysSince < 7) {
+      formatDayOfWeek(t) + " " + formatTime(t)
+    } else {
+      formatDate(t)
+    }
   }
 
 
@@ -48,7 +57,7 @@ object UserState {
     def userLowerThan(a: UserRow, b: UserRow): Boolean = {
       def userGroup(a: UserRow) = {
         if (a.login == currentUser) 0 // current user first
-        else if (a.lastState != "offline") 1 // all other users
+        else if (a.currentState != "offline") 1 // all other users
         else 2 // offline goes last
       }
       val aLevel = userGroup(a)
@@ -58,6 +67,7 @@ object UserState {
       else false
     }
 
+    //println(s"Users:\n${value.mkString("\n")}")
     value.map { u =>
       if (u._1 == currentUser) {
         val currentUserState = if (currentUserInvisible) "invisible" else u._2.state

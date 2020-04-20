@@ -33,6 +33,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
     checkIpAddress(ipAddress)
     // when the user is away or invisible, do not update his presence
     if (state != "away" && state != "invisible") {
+      println(s"Presence.reportUser ${userAuth.login} $state")
       if (state == "offline") {
         // when going offline, report only when we were not offline yet
         // beware: the same user may use several clients at the same time

@@ -307,11 +307,13 @@ object Start extends SimpleSwingApplication {
       val table = common.UserState.userTable(loginName, false, us)
 
       val loc = Locale.getDefault(Locale.Category.FORMAT)
-      val fmt = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT).withLocale(loc)
+      val fmtTime = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(loc)
+      val fmtDate = DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT).withLocale(loc)
+      val fmtDayOfWeek = DateTimeFormatter.ofPattern("eeee", loc) // Exactly 4 pattern letters will use the full form
       val zone = ZoneId.systemDefault()
 
       def displayTime(t: ZonedDateTime) = {
-        common.UserState.smartTime(t).getOrElse(fmt.format(t.withZoneSameInstant(zone)))
+        common.UserState.smartTime(t.withZoneSameInstant(zone), fmtTime.format, fmtDate.format, fmtDayOfWeek.format)
       }
 
       def userStateDisplay(state: String) = {
@@ -332,10 +334,10 @@ object Start extends SimpleSwingApplication {
       def userRowHTML(row: common.model.UserRow) = {
         //language=HTML
         s"""<tr>
-           <td>${userStateHtml(row.lastState)}</td>
+           <td>${userStateHtml(row.currentState)}</td>
            <td>${row.login}</td>
            <td>${row.location}</td>
-           <td>${displayTime(row.lastTime)}</td>
+           <td>${if (row.currentState != "online") displayTime(row.lastTime) else ""}</td>
            </tr>
           """
       }
@@ -367,8 +369,8 @@ object Start extends SimpleSwingApplication {
       panel.text = tableHTML
       pack()
       def trayUserLine(u: UserRow) = {
-        val stateText = userStateDisplay(u.lastState)._2
-        if (u.lastState != "offline") {
+        val stateText = userStateDisplay(u.currentState)._2
+        if (u.currentState != "offline") {
           s"$stateText ${u.login}: ${u.location}"
         } else {
           s"$stateText ${u.login}: ${displayTime(u.lastTime)}"

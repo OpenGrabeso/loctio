@@ -141,6 +141,7 @@ class PagePresenter(
     val sinceLastActiveMin = (System.currentTimeMillis() - lastActive) / 60000
 
     val state = if (invisible) "invisible" else if (sinceLastActiveMin < 5) "online" else "away"
+    println(s"List users $state")
     rpc.user(token).listUsers(ipAddress, state).onComplete(loadUsersCallback(token, _))
   }
 
