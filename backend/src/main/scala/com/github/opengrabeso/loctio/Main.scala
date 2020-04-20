@@ -3,7 +3,7 @@ package com.github.opengrabeso.loctio
 import java.util.Properties
 
 import com.fasterxml.jackson.databind.JsonNode
-import com.google.api.client.http.{GenericUrl, HttpHeaders}
+import com.google.api.client.http.{GenericUrl, HttpHeaders, HttpResponseException}
 import io.udash.rest.raw.HttpErrorException
 
 object Main extends common.Formatting {
@@ -43,12 +43,22 @@ object Main extends common.Formatting {
   }
 
   private def authRequest(token: String): JsonNode = {
-    val request = requestFactory.buildGetRequest(new GenericUrl("https://api.github.com/user"))
-    val headers = if (request.getHeaders != null) request.getHeaders else request.setHeaders(new HttpHeaders).getHeaders
-    headers.setAuthorization("Bearer " + token)
-    val response = request.execute() // TODO: async?
+    try {
+      val request = requestFactory.buildGetRequest(new GenericUrl("https://api.github.com/user"))
+      val headers = if (request.getHeaders != null) request.getHeaders else request.setHeaders(new HttpHeaders).getHeaders
+      headers.setAuthorization("Bearer " + token)
+      val response = request.execute() // TODO: async?
 
-    jsonMapper.readTree(response.getContent)
+      jsonMapper.readTree(response.getContent)
+    } catch {
+      case e: HttpResponseException if e.getStatusCode == 401 || e.getStatusCode == 403 =>
+        throw HttpErrorException(e.getStatusCode, e.getStatusMessage)
+      case e: HttpResponseException =>
+        println(s"Unexpected auth error $e")
+        throw HttpErrorException(e.getStatusCode, e.getStatusMessage)
+      case ex: Exception =>
+        throw HttpErrorException(500, "Unexpected error when authenticating with GitHub")
+    }
   }
 
   def authorized(login: String): Unit = {

@@ -3,9 +3,9 @@ package frontend
 package views
 package select
 
-import rest.{RestAPI, UserRestAPI}
-import com.github.opengrabeso.loctio.dataModel.SettingsModel
-import com.softwaremill.sttp.{dom => _, _}
+import com.github.opengrabeso.loctio.common.{PublicIpAddress, UserState}
+import rest.RestAPI
+import dataModel.SettingsModel
 import common.model._
 import routing._
 import io.udash._
@@ -40,29 +40,7 @@ class PagePresenter(
 
   var userData: Promise[UserContextData] = _
 
-  private val publicIpAddress = Promise[String]()
-
-  private def requestPublicIpAddress(): Unit = {
-    // TODO: we should refresh public address from time to time, it can change (network change, physical computer location change)
-    val request = sttp.get(uri"https://ipinfo.io/ip")
-
-    implicit val backend = FetchBackend()
-    val response = request.send()
-    response.onComplete {
-      case Success(r) =>
-        r.body match {
-          case Right(string) =>
-            println(s"Obtained a public IP address ${string.trim}")
-            publicIpAddress.success(string.trim)
-          case Left(value) =>
-            publicIpAddress.failure(new UnsupportedOperationException(value))
-        }
-      case Failure(ex) =>
-        publicIpAddress.failure(ex)
-    }
-  }
-
-  requestPublicIpAddress()
+  private val publicIpAddress = PublicIpAddress.get(ec)
 
   println(s"Create UserContextService, token ${properties.subProp(_.token).get}")
   properties.subProp(_.token).listen {token =>
@@ -77,8 +55,8 @@ class PagePresenter(
         loginFor.success(UserContextData(r._1, token))
 
         for {
-          context <- loginFor.future
-          ip <- publicIpAddress.future
+          context <- loginFor.future // we need to wait for this before calling startListening
+          ip <- publicIpAddress
         } {
           publicIp.set(ip)
           startListening()
@@ -149,27 +127,7 @@ class PagePresenter(
       val currentUser = currentLogin
       res match {
         case Success(value) =>
-          def userLowerThan(a: (String, LocationInfo), b: (String, LocationInfo)): Boolean = {
-            def userGroup(a: (String, LocationInfo)) = {
-              if (a._1 == currentUser) 0 // current user first
-              else if (a._2.state != "offline") 1 // all other users
-              else 2 // offline goes last
-            }
-            val aLevel = userGroup(a)
-            val bLevel = userGroup(b)
-            if (aLevel < bLevel) true
-            else if (aLevel == bLevel) a._1 < b._1 // sort alphabetically in the same group
-            else false
-          }
-          model.subProp(_.loading).set(false)
-          model.subProp(_.users).set(value.sortWith(userLowerThan).map { u =>
-            if (u._1 == currentLogin) {
-              val currentUserState = if (properties.subProp(_.invisible).get) "invisible" else u._2.state
-              UserRow(u._1, u._2.location, u._2.lastSeen, currentUserState)
-            } else {
-              UserRow(u._1, u._2.location, u._2.lastSeen, u._2.state)
-            }
-          })
+          model.subProp(_.users).set(UserState.userTable(currentUser, properties.subProp(_.invisible).get, value))
           model.subProp(_.loading).set(false)
         case Failure(exception) =>
           model.subProp(_.error).set(Some(exception))
@@ -183,6 +141,7 @@ class PagePresenter(
     val sinceLastActiveMin = (System.currentTimeMillis() - lastActive) / 60000
 
     val state = if (invisible) "invisible" else if (sinceLastActiveMin < 5) "online" else "away"
+    println(s"List users $state")
     rpc.user(token).listUsers(ipAddress, state).onComplete(loadUsersCallback(token, _))
   }
 

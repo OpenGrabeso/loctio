@@ -5,6 +5,7 @@ package select
 
 import java.time.{Duration, ZonedDateTime}
 
+import common.model.UserRow
 import common.css._
 import io.udash._
 import io.udash.bootstrap.button.UdashButton
@@ -24,24 +25,7 @@ class PageView(
 
 
   def getUserStatusIcon(state: String, time: ZonedDateTime) = {
-    val displayState = state match {
-      case  "online" | "busy" =>
-        val now = ZonedDateTime.now()
-        val age = Duration.between(time, now).toMinutes
-        if (age < 5) {
-          state
-        } else if (age < 60) {
-          "away"
-        } else {
-          "offline"
-        }
-      case _ =>
-        // if user is reported as offline, do not check if the user was active recently
-        // as we got a positive notification about going offline
-        // note: invisible user is reporting offline as well
-        state
-    }
-
+    val displayState = common.UserState.getEffectiveUserStatus(state, time)
     img(
       s.stateIcon,
       src := "static/user-" + displayState + ".ico",
@@ -113,10 +97,13 @@ class PageView(
     // value is a callback
     type DisplayAttrib = TableFactory.TableAttrib[UserRow]
     val attribs = Seq[DisplayAttrib](
-      TableFactory.TableAttrib("", (ar, _, _) => Seq[Modifier](s.statusTd, getUserStatusIcon(ar.lastState, ar.lastTime).render)),
+      TableFactory.TableAttrib("", (ar, _, _) => Seq[Modifier](s.statusTd, getUserStatusIcon(ar.currentState, ar.lastTime).render)),
       TableFactory.TableAttrib("User", (ar, _, _) => ar.login.render),
       TableFactory.TableAttrib("Location", (ar, _, _) => ar.location.render),
-      TableFactory.TableAttrib("Last seen", (ar, _, _) => formatDateTime(ar.lastTime.toJSDate).render),
+      TableFactory.TableAttrib(
+        "Last seen",
+        (ar, _, _) => if (ar.currentState != "online") common.UserState.smartTime(ar.lastTime, formatTime, formatDate, formatDayOfWeek).render else ""
+      ),
       TableFactory.TableAttrib("", (ar, _, _) => userDropDown(ar)),
     )
 

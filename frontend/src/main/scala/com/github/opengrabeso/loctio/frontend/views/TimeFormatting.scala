@@ -7,8 +7,7 @@ import org.scalajs.dom.experimental.intl
 import org.scalajs.dom.experimental.intl.DateTimeFormatOptions
 
 import scala.scalajs.js.annotation.JSGlobal
-import scala.scalajs.js.|
-
+import scala.scalajs.js.{Date, |}
 import TimeFormatting._
 trait TimeFormatting {
   def locale: String = {
@@ -21,53 +20,56 @@ trait TimeFormatting {
     new DateTimeFormatX().resolvedOptions().timeZone.getOrElse("Etc/GMT")
   }
 
+
+  private def formatWithOptions(t: Date, options: DateTimeFormatOptions) = {
+    try {
+      new intl.DateTimeFormat(
+        locale,
+        options = options
+      ).format(t)
+    } catch {
+      case _: Exception =>
+        s"Invalid time"
+    }
+  }
+
   def formatDateTime(t: js.Date): String = {
-    try {
-      new intl.DateTimeFormat(
-        locale,
-        options = intl.DateTimeFormatOptions(
-          year = "numeric",
-          month = "numeric",
-          day = "numeric",
-          hour = "numeric",
-          minute = "numeric"
-        )
-      ).format(t)
-    } catch {
-      case _: Exception =>
-        s"Invalid time"
-    }
+    formatWithOptions(t, intl.DateTimeFormatOptions(
+      year = "numeric",
+      month = "numeric",
+      day = "numeric",
+      hour = "numeric",
+      minute = "numeric"
+    ))
   }
 
-  def formatTime(t: js.Date) = {
-    try {
-      new intl.DateTimeFormat(
-        locale,
-        options = intl.DateTimeFormatOptions(
-          hour = "numeric",
-          minute = "numeric",
-        )
-      ).format(t)
-    } catch {
-      case _: Exception =>
-        s"Invalid time"
-    }
+  def formatDate(t: js.Date): String = {
+    formatWithOptions(t, intl.DateTimeFormatOptions(
+      year = "numeric",
+      month = "numeric",
+      day = "numeric"
+    ))
   }
 
-  def formatTimeHMS(t: js.Date) = {
-    try {
-      new intl.DateTimeFormat(
-        locale,
-        options = intl.DateTimeFormatOptions(
-          hour = "numeric",
-          minute = "numeric",
-          second = "numeric",
-        )
-      ).format(t)
-    } catch {
-      case _: Exception =>
-        s"Invalid time"
-    }
+  def formatDayOfWeek(t: js.Date): String = {
+    formatWithOptions(t, intl.DateTimeFormatOptions(
+      weekday = "long"
+    ))
+  }
+
+  def formatTime(t: js.Date): String = {
+    formatWithOptions(t, intl.DateTimeFormatOptions(
+      hour = "numeric",
+      minute = "numeric",
+    ))
+  }
+
+  def formatTimeHMS(t: js.Date): String = {
+    formatWithOptions(t, intl.DateTimeFormatOptions(
+      hour = "numeric",
+      minute = "numeric",
+      second = "numeric",
+    ))
   }
 
   implicit class ZonedDateTimeOps(t: ZonedDateTime) {
@@ -77,6 +79,12 @@ trait TimeFormatting {
       new js.Date(js.Date.parse(text))
     }
   }
+
+  def formatDate(t: ZonedDateTime): String = formatDate(t.toJSDate)
+  def formatTime(t: ZonedDateTime): String = formatTime(t.toJSDate)
+  def formatDateTime(t: ZonedDateTime): String = formatDateTime(t.toJSDate)
+  def formatTimeHMS(t: ZonedDateTime): String = formatTimeHMS(t.toJSDate)
+  def formatDayOfWeek(t: ZonedDateTime): String = formatDayOfWeek(t.toJSDate)
 
   def displayTimeRange(startTime: ZonedDateTime, endTime: ZonedDateTime): String = {
     s"${formatDateTime(startTime.toJSDate)}...${formatTime(endTime.toJSDate)}"
