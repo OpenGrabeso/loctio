@@ -92,6 +92,7 @@ lazy val trayUtil = (project in file("tray-util"))
     libraryDependencies += "com.twelvemonkeys.imageio" % "imageio-bmp" % "3.5",
     libraryDependencies += "org.scala-lang.modules" %% "scala-swing" % "2.1.1",
     libraryDependencies ++= commonLibs ++ jvmLibs,
+    assemblyJarName in assembly := "loctio-tray.jar",
     assemblyMergeStrategy in assembly := {
       case x if x.contains("io.netty.versions.properties") => MergeStrategy.discard
       case x =>
