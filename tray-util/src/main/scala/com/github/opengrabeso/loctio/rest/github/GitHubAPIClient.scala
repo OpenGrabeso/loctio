@@ -14,7 +14,7 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
 object GitHubAPIClient {
-  implicit val sttpBackend: SttpBackend[Future, Nothing] = SttpRestClient.defaultBackend()
+  import rest.RestAPIClient.sttpBackend
   val api: RestAPI = SttpRestClient[RestAPI]("https://api.github.com")
   def apply(): RestAPI = api
 
