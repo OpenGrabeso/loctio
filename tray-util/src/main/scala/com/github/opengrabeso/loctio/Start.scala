@@ -111,9 +111,20 @@ object Start extends SimpleSwingApplication {
   }
 
   def requestNotifications(token: String): Unit = {
+    import rest.github.DataWithHeaders
     if (notificationsSchedule != null) {
       notificationsSchedule.cancel()
       notificationsSchedule = null
+    }
+
+    def requestNextAfter(seconds: Int) = {
+      notificationsSchedule = system.scheduler.scheduleOnce(Duration(seconds, duration.SECONDS)){
+        requestNotifications(token)
+      }(OnSwing)
+    }
+
+    def requestNext(headers: DataWithHeaders.Headers) = {
+      requestNextAfter(headers.xPollInterval.map(_.toInt).getOrElse(60))
     }
 
     githubApi(token).notifications.get(ifModifiedSince = lastNotifications.orNull).at(OnSwing).map { ns =>
@@ -128,6 +139,19 @@ object Start extends SimpleSwingApplication {
       mainFrame.addNotifications(ns.data)
 
       lastNotifications = ns.headers.lastModified orElse lastNotifications
+      requestNext(ns.headers)
+
+    }.failed.at(OnSwing).foreach {
+      case rest.github.DataWithHeaders.HttpErrorExceptionWithHeaders(ex, headers) =>
+        // expected - this mean nothing had changed and there is nothing to do
+        requestNext(headers)
+        if (ex.code != 304) { // // 304 is expected - this mean nothing had changed and there is nothing to do
+          println(s"Notifications failed $ex")
+        }
+      case ex  =>
+        requestNextAfter(60)
+        println(s"Notifications failed $ex")
+
     }
 
   }
@@ -149,6 +173,7 @@ object Start extends SimpleSwingApplication {
         }
       }(global)
 
+      mainFrame.clearNotifications()
       requestNotifications(token)
     }
   }
@@ -168,11 +193,11 @@ object Start extends SimpleSwingApplication {
     frame.location = loc
   }
 
-  def placeFrameAbove(frame: Frame, location: Point) = {
+  private def placeFrameAbove(frame: Frame, location: Point) = {
     placeFrame(frame, new Point(location.x, location.y - frame.size.height - 150))
   }
 
-  def openWindow(location: Point): Unit = {
+  private def openWindow(location: Point): Unit = {
     // place the window a bit above the mouse - this avoid conflicting with the menu
     placeFrameAbove(mainFrame, location)
     if (usersReady) {
@@ -180,11 +205,11 @@ object Start extends SimpleSwingApplication {
     }
   }
 
-  def openWeb(location: Point): Unit = {
+  private def openWeb(location: Point): Unit = {
     Desktop.getDesktop.browse(new URL(s"https://${appName.toLowerCase}.appspot.com").toURI)
   }
 
-  def appExit() = {
+  private def appExit() = {
     println("appExit")
     icon.foreach(Tray.remove)
     userApi.at(global).flatMap(_.shutdown(rest.UserRestAPI.RestString("now"))).at(OnSwing).foreach {_ =>
@@ -431,6 +456,12 @@ object Start extends SimpleSwingApplication {
       this
     }
 
+    def clearNotifications(): this.type = {
+      notificationsList = Seq.empty
+      addNotifications(Seq.empty) // update the Swing component
+      this
+    }
+
     def addNotifications(ns: Seq[Notification]): this.type = {
 
       def notificationHTML(n: Notification) = {
@@ -441,7 +472,7 @@ object Start extends SimpleSwingApplication {
          """
       }
 
-      notificationsList ++= ns
+      notificationsList = ns ++ notificationsList
 
       val notificationsTable =
         s"""<html>
