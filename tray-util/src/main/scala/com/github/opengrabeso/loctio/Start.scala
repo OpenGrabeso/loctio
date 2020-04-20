@@ -314,8 +314,7 @@ object Start extends SimpleSwingApplication {
     private def changeStateImpl(icon: TrayIcon, s: String): Unit = {
       assert(SwingUtilities.isEventDispatchThread)
       state = s
-      val title = appName
-      val text = if (state.isEmpty) title else state
+      val text = if (state.isEmpty) appName else state
       icon.setToolTip(text)
     }
 
@@ -337,6 +336,11 @@ object Start extends SimpleSwingApplication {
       swingInvokeAndWait(removeImpl(icon))
     }
 
+    def message(message: String): Unit = {
+      assert(SwingUtilities.isEventDispatchThread)
+      icon.foreach(_.displayMessage(appName, message, TrayIcon.MessageType.NONE))
+    }
+
     def changeState(icon: TrayIcon, s: String): Unit = {
       OnSwing.future {
         changeStateImpl(icon, s)
@@ -347,6 +351,8 @@ object Start extends SimpleSwingApplication {
   val icon = Tray.show()
 
   def reportTray(message: String): Unit = {
+    assert(SwingUtilities.isEventDispatchThread)
+
     icon.foreach(Tray.changeState(_, message))
   }
 
@@ -499,6 +505,11 @@ object Start extends SimpleSwingApplication {
 
       notifications.text = notificationsTable
       pack()
+
+      // avoid flooding the notification area in case the user has many notifications
+      for (n <- ns take 10) {
+        Tray.message(n.subject.title)
+      }
 
       this
     }
