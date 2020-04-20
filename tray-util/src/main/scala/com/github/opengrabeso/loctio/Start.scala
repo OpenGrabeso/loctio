@@ -129,13 +129,6 @@ object Start extends SimpleSwingApplication {
 
     githubApi(token).notifications.get(ifModifiedSince = lastNotifications.orNull).at(OnSwing).map { ns =>
       println("Notifications " + ns.data.size)
-      /* TODO: Tray notifications
-      for {
-        n <- ns.data
-      } {
-        Tray.message("New message from GitHub")
-      }
-       */
       mainFrame.addNotifications(ns.data)
 
       lastNotifications = ns.headers.lastModified orElse lastNotifications
@@ -199,9 +192,11 @@ object Start extends SimpleSwingApplication {
 
   private def openWindow(location: Point): Unit = {
     // place the window a bit above the mouse - this avoid conflicting with the menu
-    placeFrameAbove(mainFrame, location)
     if (usersReady) {
-      mainFrame.open()
+      if (!mainFrame.visible) {
+        placeFrameAbove(mainFrame, location)
+      }
+      mainFrame.open() // open or make focused / on top (if already open)
     }
   }
 
@@ -365,6 +360,7 @@ object Start extends SimpleSwingApplication {
     panel.font = panel.font.deriveFont(panel.font.getSize2D * 1.2f)
 
     val notifications = new Label() {
+      preferredSize= new Dimension(260, 800) // allow narrow size so that label content is wrapped if necessary
       listenTo(mouse.clicks)
       reactions += {
         case e: MouseClicked if e.peer.getButton == 1 =>
@@ -373,12 +369,16 @@ object Start extends SimpleSwingApplication {
     }
 
     val columns = Seq("", "User", "Location", "Last seen")
-    contents = new ScrollPane(
-      new BoxPanel(Orientation.Vertical) {
-        contents += panel
-        contents += notifications
-      }
-    )
+    val splitPane = new SplitPane(
+      Orientation.Horizontal,
+      new ScrollPane(panel),
+      new ScrollPane(notifications)
+    ).tap { pane =>
+      pane.preferredSize = new Dimension(300, 600)
+      pane.resizeWeight = 0
+    }
+
+    contents = splitPane
 
     private var notificationsList = Seq.empty[Notification]
 
@@ -446,8 +446,12 @@ object Start extends SimpleSwingApplication {
             </body>
            </html>
         """
+      val oldSize = panel.preferredSize
       panel.text = tableHTML
-      pack()
+      pack() // recompute preferred size
+      if (oldSize.height != panel.preferredSize.height) {
+        splitPane.dividerLocation = (panel.preferredSize.height + 10) min 300
+      }
       def trayUserLine(u: UserRow) = {
         val stateText = userStateDisplay(u.currentState)._2
         if (u.currentState != "offline") {
@@ -507,7 +511,7 @@ object Start extends SimpleSwingApplication {
       pack()
 
       // avoid flooding the notification area in case the user has many notifications
-      for (n <- ns take 10) {
+      for (n <- ns.take(5).reverse) { // reverse to display oldest first
         Tray.message(n.subject.title)
       }
 
