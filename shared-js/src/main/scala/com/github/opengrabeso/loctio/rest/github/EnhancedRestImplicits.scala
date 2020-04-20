@@ -1,12 +1,13 @@
 package com.github.opengrabeso.loctio
-package rest
+package rest.github
 
 import com.avsystem.commons.meta.MacroInstances
-import com.avsystem.commons.serialization.{GenCodec, HasGenCodecWithDeps}
+import com.avsystem.commons.serialization.{GenCodec, GenKeyCodec, HasGenCodecWithDeps, Input, Output}
+import com.github.opengrabeso.loctio.rest.ZonedDateTimeCodecs
 import io.udash.rest._
 import io.udash.rest.openapi.{RestSchema, RestStructure}
 
-trait EnhancedRestImplicits extends DefaultRestImplicits with ZonedDateTimeCodecs
+trait EnhancedRestImplicits extends DefaultRestImplicits with ZonedDateTimeCodecs with DataWithHeaders.Implicits
 
 object EnhancedRestImplicits extends EnhancedRestImplicits
 
@@ -16,8 +17,6 @@ abstract class EnhancedRestDataCompanion[T](
   implicit val instances: MacroInstances[DefaultRestImplicits, CodecWithStructure[T]] = implicitly[MacroInstances[DefaultRestImplicits, CodecWithStructure[T]]]
   implicit lazy val restStructure: RestStructure[T] = instances(DefaultRestImplicits, this).structure
   implicit lazy val restSchema: RestSchema[T] = RestSchema.lazySchema(restStructure.standaloneSchema)
-
-
 }
 
 

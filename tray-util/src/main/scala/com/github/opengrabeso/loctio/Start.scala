@@ -9,7 +9,9 @@ import java.util.Locale
 
 import akka.actor.{ActorSystem, Cancellable}
 import com.github.opengrabeso.loctio.common.PublicIpAddress
+import com.github.opengrabeso.loctio.common.model.github.Notification
 import com.github.opengrabeso.loctio.common.model.{LocationInfo, UserRow}
+import com.github.opengrabeso.loctio.rest.github.AuthorizedAPI
 import javax.swing.SwingUtilities
 import rest.{RestAPI, RestAPIClient}
 
@@ -23,6 +25,8 @@ import shared.ChainingSyntax._
 import scala.concurrent.ExecutionContext.global
 import shared.FutureAt._
 
+import scala.swing.event.MouseClicked
+
 object Start extends SimpleSwingApplication {
 
   implicit val system = ActorSystem()
@@ -33,6 +37,8 @@ object Start extends SimpleSwingApplication {
   private var loginName = ""
   private var usersReady = false
   private var updateSchedule: Cancellable = _
+  private var notificationsSchedule: Cancellable = _
+  var lastNotifications =  Option.empty[String]
 
   trait ServerUsed {
     def url: String
@@ -94,6 +100,8 @@ object Start extends SimpleSwingApplication {
     Future.failed(throw new NoSuchElementException("No token provided"))
   }
 
+  def githubApi(token: String): AuthorizedAPI = rest.github.GitHubAPIClient.api.authorized("Bearer " + cfg.token)
+
   def login(location: Point) = {
     assert(SwingUtilities.isEventDispatchThread)
     val frame = loginFrame
@@ -102,6 +110,51 @@ object Start extends SimpleSwingApplication {
     frame.open()
   }
 
+  def requestNotifications(token: String): Unit = {
+    import rest.github.DataWithHeaders
+    if (notificationsSchedule != null) {
+      notificationsSchedule.cancel()
+      notificationsSchedule = null
+    }
+
+    def requestNextAfter(seconds: Int) = {
+      notificationsSchedule = system.scheduler.scheduleOnce(Duration(seconds, duration.SECONDS)){
+        requestNotifications(token)
+      }(OnSwing)
+    }
+
+    def requestNext(headers: DataWithHeaders.Headers) = {
+      requestNextAfter(headers.xPollInterval.map(_.toInt).getOrElse(60))
+    }
+
+    githubApi(token).notifications.get(ifModifiedSince = lastNotifications.orNull).at(OnSwing).map { ns =>
+      println("Notifications " + ns.data.size)
+      /* TODO: Tray notifications
+      for {
+        n <- ns.data
+      } {
+        Tray.message("New message from GitHub")
+      }
+       */
+      mainFrame.addNotifications(ns.data)
+
+      lastNotifications = ns.headers.lastModified orElse lastNotifications
+      requestNext(ns.headers)
+
+    }.failed.at(OnSwing).foreach {
+      case rest.github.DataWithHeaders.HttpErrorExceptionWithHeaders(ex, headers) =>
+        // expected - this mean nothing had changed and there is nothing to do
+        requestNext(headers)
+        if (ex.code != 304) { // // 304 is expected - this mean nothing had changed and there is nothing to do
+          println(s"Notifications failed $ex")
+        }
+      case ex  =>
+        requestNextAfter(60)
+        println(s"Notifications failed $ex")
+
+    }
+
+  }
   def performLogin(token: String): Unit = {
     usersReady = false
     loginName = ""
@@ -116,10 +169,12 @@ object Start extends SimpleSwingApplication {
           if (token == cfg.token) { // ignore any pending futures with a different token
             usersReady = true
             mainFrame.setUsers(users)
-            println("User list ready")
           }
         }
       }(global)
+
+      mainFrame.clearNotifications()
+      requestNotifications(token)
     }
   }
 
@@ -138,11 +193,11 @@ object Start extends SimpleSwingApplication {
     frame.location = loc
   }
 
-  def placeFrameAbove(frame: Frame, location: Point) = {
+  private def placeFrameAbove(frame: Frame, location: Point) = {
     placeFrame(frame, new Point(location.x, location.y - frame.size.height - 150))
   }
 
-  def openWindow(location: Point): Unit = {
+  private def openWindow(location: Point): Unit = {
     // place the window a bit above the mouse - this avoid conflicting with the menu
     placeFrameAbove(mainFrame, location)
     if (usersReady) {
@@ -150,11 +205,11 @@ object Start extends SimpleSwingApplication {
     }
   }
 
-  def openWeb(location: Point): Unit = {
+  private def openWeb(location: Point): Unit = {
     Desktop.getDesktop.browse(new URL(s"https://${appName.toLowerCase}.appspot.com").toURI)
   }
 
-  def appExit() = {
+  private def appExit() = {
     println("appExit")
     icon.foreach(Tray.remove)
     userApi.at(global).flatMap(_.shutdown(rest.UserRestAPI.RestString("now"))).at(OnSwing).foreach {_ =>
@@ -259,8 +314,7 @@ object Start extends SimpleSwingApplication {
     private def changeStateImpl(icon: TrayIcon, s: String): Unit = {
       assert(SwingUtilities.isEventDispatchThread)
       state = s
-      val title = appName
-      val text = if (state.isEmpty) title else state
+      val text = if (state.isEmpty) appName else state
       icon.setToolTip(text)
     }
 
@@ -282,6 +336,11 @@ object Start extends SimpleSwingApplication {
       swingInvokeAndWait(removeImpl(icon))
     }
 
+    def message(message: String): Unit = {
+      assert(SwingUtilities.isEventDispatchThread)
+      icon.foreach(_.displayMessage(appName, message, TrayIcon.MessageType.NONE))
+    }
+
     def changeState(icon: TrayIcon, s: String): Unit = {
       OnSwing.future {
         changeStateImpl(icon, s)
@@ -292,6 +351,8 @@ object Start extends SimpleSwingApplication {
   val icon = Tray.show()
 
   def reportTray(message: String): Unit = {
+    assert(SwingUtilities.isEventDispatchThread)
+
     icon.foreach(Tray.changeState(_, message))
   }
 
@@ -303,25 +364,37 @@ object Start extends SimpleSwingApplication {
     val panel = new Label()
     panel.font = panel.font.deriveFont(panel.font.getSize2D * 1.2f)
 
+    val notifications = new Label() {
+      listenTo(mouse.clicks)
+      reactions += {
+        case e: MouseClicked if e.peer.getButton == 1 =>
+          Desktop.getDesktop.browse(new URL(s"https://www.github.com/notifications?query=is%3Aunread").toURI)
+      }
+    }
+
     val columns = Seq("", "User", "Location", "Last seen")
     contents = new ScrollPane(
       new BoxPanel(Orientation.Vertical) {
         contents += panel
+        contents += notifications
       }
     )
 
+    private var notificationsList = Seq.empty[Notification]
+
+    private val loc = Locale.getDefault(Locale.Category.FORMAT)
+    private val fmtTime = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(loc)
+    private val fmtDate = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(loc)
+    private val fmtDayOfWeek = DateTimeFormatter.ofPattern("eeee", loc) // Exactly 4 pattern letters will use the full form
+    private val zone = ZoneId.systemDefault()
+
+    private def displayTime(t: ZonedDateTime) = {
+      common.UserState.smartTime(t.withZoneSameInstant(zone), fmtTime.format, fmtDate.format, fmtDayOfWeek.format)
+    }
+
+
     def setUsers(us: Seq[(String, LocationInfo)]): this.type = {
       val table = common.UserState.userTable(loginName, false, us)
-
-      val loc = Locale.getDefault(Locale.Category.FORMAT)
-      val fmtTime = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(loc)
-      val fmtDate = DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT).withLocale(loc)
-      val fmtDayOfWeek = DateTimeFormatter.ofPattern("eeee", loc) // Exactly 4 pattern letters will use the full form
-      val zone = ZoneId.systemDefault()
-
-      def displayTime(t: ZonedDateTime) = {
-        common.UserState.smartTime(t.withZoneSameInstant(zone), fmtTime.format, fmtDate.format, fmtDayOfWeek.format)
-      }
 
       def userStateDisplay(state: String) = {
         state match { // from https://www.alt-codes.net/circle-symbols
@@ -386,6 +459,58 @@ object Start extends SimpleSwingApplication {
       val onlineUsers = table.filter(u => u.login != loginName && u.lastTime.until(ZonedDateTime.now(), ChronoUnit.DAYS) < 7)
       val statusText = onlineUsers.map(u => trayUserLine(u)).mkString("\n")
       reportTray(statusText)
+      this
+    }
+
+    def clearNotifications(): this.type = {
+      notificationsList = Seq.empty
+      addNotifications(Seq.empty) // update the Swing component
+      this
+    }
+
+    def addNotifications(ns: Seq[Notification]): this.type = {
+
+      def notificationHTML(n: Notification) = {
+        //language=HTML
+        s"""
+        <tr><td><b>${n.subject.title}</b><br>
+        ${n.repository.full_name} ${displayTime(n.updated_at)}</td></tr>
+         """
+      }
+
+      notificationsList = ns ++ notificationsList
+
+      val notificationsTable =
+        s"""<html>
+            <head>
+            <style>
+            table {
+              border-collapse: collapse;
+            }
+            table {
+              border: 1px none #ff0000;
+            }
+            th, td {
+              border: 1px solid #e0e0e0;
+            }
+            </style>
+            </head>
+            <body>
+              <table>
+              ${notificationsList.map(notificationHTML).mkString}
+              </table>
+            </body>
+           </html>
+        """
+
+      notifications.text = notificationsTable
+      pack()
+
+      // avoid flooding the notification area in case the user has many notifications
+      for (n <- ns take 10) {
+        Tray.message(n.subject.title)
+      }
+
       this
     }
   }
