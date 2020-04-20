@@ -1,5 +1,7 @@
 package com.github.opengrabeso.loctio
 
+import java.awt.Desktop
+import java.net.URL
 import java.time.{ZoneId, ZonedDateTime}
 import java.time.format._
 import java.time.temporal.ChronoUnit
@@ -148,6 +150,10 @@ object Start extends SimpleSwingApplication {
     }
   }
 
+  def openWeb(location: Point): Unit = {
+    Desktop.getDesktop.browse(new URL(s"https://${appName.toLowerCase}.appspot.com").toURI)
+  }
+
   def appExit() = {
     println("appExit")
     icon.foreach(Tray.remove)
@@ -202,6 +208,7 @@ object Start extends SimpleSwingApplication {
         }
 
         val openItem = addItem("Open...", openWindow)
+        addItem("Open web...", openWeb)
         popup.addSeparator()
         addItem("Login...", login)
         popup.addSeparator()
