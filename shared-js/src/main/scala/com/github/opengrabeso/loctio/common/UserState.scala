@@ -39,7 +39,10 @@ object UserState {
     formatDate: ZonedDateTime => String,
     formatDayOfWeek: ZonedDateTime => String
   ): String = {
-    def roundTime(t: ZonedDateTime) = t.withMinute((t.getMinute + 7)  / 15 * 15)
+    def roundTime(t: ZonedDateTime) = {
+      val roundOffset = (t.getMinute + 7)  / 15 * 15 - t.getMinute
+      t.plusMinutes(roundOffset)
+    }
     val now = ZonedDateTime.now()
     val since = t.until(now, ChronoUnit.MINUTES)
     val daysSince = ChronoUnit.DAYS.between(t, now)
