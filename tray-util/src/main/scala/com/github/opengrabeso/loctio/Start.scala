@@ -369,8 +369,8 @@ object Start extends SimpleSwingApplication {
 
     title = appName
 
-    val panel = new Label()
-    panel.font = panel.font.deriveFont(panel.font.getSize2D * 1.2f)
+    val users = new Label()
+    users.font = users.font.deriveFont(users.font.getSize2D * 1.2f)
 
     val notifications = new Label() {
       //preferredSize= new Dimension(260, 800) // allow narrow size so that label content is wrapped if necessary
@@ -384,7 +384,7 @@ object Start extends SimpleSwingApplication {
     val columns = Seq("", "User", "Location", "Last seen")
     val splitPane = new SplitPane(
       Orientation.Horizontal,
-      new ScrollPane(panel),
+      new ScrollPane(users),
       new ScrollPane(notifications)
     ).tap { pane =>
       pane.preferredSize = new Dimension(300, 600)
@@ -459,11 +459,11 @@ object Start extends SimpleSwingApplication {
             </body>
            </html>
         """
-      val oldSize = panel.preferredSize
-      panel.text = tableHTML
+      val oldSize = users.preferredSize
+      users.text = tableHTML
       pack() // recompute preferred size
-      if (oldSize.height != panel.preferredSize.height) {
-        splitPane.dividerLocation = (panel.preferredSize.height + 10) min 300
+      if (oldSize.height != users.preferredSize.height) {
+        splitPane.dividerLocation = (users.preferredSize.height + 10) min 300
       }
       def trayUserLine(u: UserRow) = {
         val stateText = userStateDisplay(u.currentState)._2
