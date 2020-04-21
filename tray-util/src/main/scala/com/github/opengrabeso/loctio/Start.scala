@@ -373,10 +373,10 @@ object Start extends SimpleSwingApplication {
 
     title = appName
 
-    val users = new Label()
+    val users = new HtmlPanel()
     users.font = users.font.deriveFont(users.font.getSize2D * 1.2f)
 
-    val notifications = new Label() {
+    val notifications = new HtmlPanel() {
       //preferredSize= new Dimension(260, 800) // allow narrow size so that label content is wrapped if necessary
       listenTo(mouse.clicks)
       reactions += {
@@ -385,28 +385,14 @@ object Start extends SimpleSwingApplication {
       }
     }
 
-    class ScalaXHTMLPanel extends Panel {
-      lazy val uac = new NaiveUserAgent
-      override lazy val peer: XHTMLPanel = new XHTMLPanel(uac) with SuperMixin
-
-      def html: String = throw new UnsupportedOperationException("HTML document is write only")
-      def html_=(text: String): Unit = {
-        val is = new ByteArrayInputStream(text.getBytes)
-        val url = "loctio://" // invalid URL
-        peer.setDocument(is, url)
-      }
-    }
-
-    val html = new ScalaXHTMLPanel()
-
     val columns = Seq("", "User", "Location", "Last seen")
     val splitPane = new SplitPane(
       Orientation.Horizontal,
       new ScrollPane(users),
-      new ScrollPane(html)
+      new ScrollPane(notifications)
     ).tap { pane =>
       pane.preferredSize = new Dimension(300, 600)
-      pane.resizeWeight = 0
+      pane.resizeWeight = 0.3
     }
 
     contents = splitPane
@@ -478,11 +464,8 @@ object Start extends SimpleSwingApplication {
            </html>
         """
       val oldSize = users.preferredSize
-      users.text = tableHTML
+      users.html = tableHTML
       pack() // recompute preferred size
-      if (oldSize.height != users.preferredSize.height) {
-        splitPane.dividerLocation = (users.preferredSize.height + 10) min 300
-      }
       def trayUserLine(u: UserRow) = {
         val stateText = userStateDisplay(u.currentState)._2
         if (u.currentState != "offline") {
@@ -538,7 +521,7 @@ object Start extends SimpleSwingApplication {
            </html>
         """
 
-      html.html = notificationsTable
+      notifications.html = notificationsTable
       pack()
 
       // avoid flooding the notification area in case the user has many notifications
