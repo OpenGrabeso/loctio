@@ -557,7 +557,7 @@ object Start extends SimpleSwingApplication {
         contents += loginField
       }
       contents += new BoxPanel(Orientation.Horizontal) {
-        contents += new Label("Enter your GitHub token (no scopes necessary):")
+        contents += new Label("Enter your GitHub token (scopes repo and notifications needed):")
       }
       contents += new BoxPanel(Orientation.Horizontal) {
         contents += tokenField.tap(_.columns = 40)
