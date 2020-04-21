@@ -1,7 +1,6 @@
 package com.github.opengrabeso.loctio
 
 import java.awt.Desktop
-import java.io.ByteArrayInputStream
 import java.net.URL
 import java.time.{ZoneId, ZonedDateTime}
 import java.time.format._
@@ -14,9 +13,6 @@ import com.github.opengrabeso.loctio.common.model.github.Notification
 import com.github.opengrabeso.loctio.common.model.{LocationInfo, UserRow}
 import com.github.opengrabeso.loctio.rest.github.AuthorizedAPI
 import javax.swing.SwingUtilities
-import org.w3c.dom.Document
-import org.xhtmlrenderer.simple.XHTMLPanel
-import org.xhtmlrenderer.swing.NaiveUserAgent
 import rest.{RestAPI, RestAPIClient}
 
 import scala.concurrent.duration.Duration
@@ -42,6 +38,8 @@ object Start extends SimpleSwingApplication {
   private var usersReady = false
   private var updateSchedule: Cancellable = _
   private var notificationsSchedule: Cancellable = _
+  private var serverUrl: String = _
+
   var lastNotifications =  Option.empty[String]
 
   trait ServerUsed {
@@ -95,7 +93,7 @@ object Start extends SimpleSwingApplication {
       serverFound.trySuccess(ServerProduction)
     }
 
-    serverFound.future
+    serverFound.future.tap(_.foreach(s => serverUrl = s.url)) // TODO: make thread robust
   }
 
   def userApi: Future[rest.UserRestAPI] = if (cfg.token.nonEmpty) {
@@ -153,9 +151,11 @@ object Start extends SimpleSwingApplication {
 
   }
   def performLogin(token: String): Unit = {
+    if (loginName != "") { // remove previous information
+      mainFrame.setUsers(Seq.empty)
+    }
     usersReady = false
     loginName = ""
-    mainFrame.setUsers(Seq.empty)
     server.at(global).flatMap(_.api.user(token).name).at(global).map(_._1).at(OnSwing).foreach { s =>
       loginName = s
       println(s"Login done $s")
@@ -197,6 +197,9 @@ object Start extends SimpleSwingApplication {
   private def openWindow(location: Point): Unit = {
     // place the window a bit above the mouse - this avoid conflicting with the menu
     if (usersReady) {
+
+      if (mainFrame.size == new Dimension(0,0)) mainFrame.pack()
+
       if (!mainFrame.visible) {
         placeFrameAbove(mainFrame, location)
       }
@@ -257,7 +260,7 @@ object Start extends SimpleSwingApplication {
           val item = new JMenuItem(title)
           object listener extends ActionListener {
             def actionPerformed(e: ActionEvent) = {
-              action(MouseInfo.getPointerInfo.getLocation)
+              action(java.awt.MouseInfo.getPointerInfo.getLocation)
             }
           }
           item.addActionListener(listener)
@@ -296,7 +299,7 @@ object Start extends SimpleSwingApplication {
 
         // note: this does not work on Java 8 (see https://bugs.openjdk.java.net/browse/JDK-8146537)
         trayIcon.addActionListener { e =>
-          openWebGitHub()
+          openWindow(java.awt.MouseInfo.getPointerInfo.getLocation)
         }
 
 
@@ -373,15 +376,15 @@ object Start extends SimpleSwingApplication {
 
     title = appName
 
-    val users = new HtmlPanel()
+    val users = new HtmlPanel(serverUrl)
     users.font = users.font.deriveFont(users.font.getSize2D * 1.2f)
 
-    val notifications = new HtmlPanel() {
+    val notifications = new HtmlPanel(serverUrl) {
       //preferredSize= new Dimension(260, 800) // allow narrow size so that label content is wrapped if necessary
       listenTo(mouse.clicks)
       reactions += {
         case e: MouseClicked if e.peer.getButton == 1 =>
-          openWebGitHub()
+          openWindow(java.awt.MouseInfo.getPointerInfo.getLocation)
       }
     }
 
@@ -391,7 +394,7 @@ object Start extends SimpleSwingApplication {
       new ScrollPane(users),
       new ScrollPane(notifications)
     ).tap { pane =>
-      pane.preferredSize = new Dimension(300, 600)
+      pane.preferredSize = new Dimension(330, 600)
       pane.resizeWeight = 0.3
     }
 
@@ -428,10 +431,15 @@ object Start extends SimpleSwingApplication {
         s"<span style='color: $color'>$text</span>"
       }
 
+      def getUserStatusIcon(state: String) = {
+        //s"""<img class="state-icon" src="user-$state.ico"></img>"""
+        s"<img class='state-icon' src='${serverUrl}//static/user-$state.ico'></img>"
+      }
+
       def userRowHTML(row: common.model.UserRow) = {
         //language=HTML
         s"""<tr>
-           <td>${userStateHtml(row.currentState)}</td>
+           <td>${getUserStatusIcon(row.currentState)}</td>
            <td>${row.login}</td>
            <td>${row.location}</td>
            <td>${if (row.currentState != "online") displayTime(row.lastTime) else ""}</td>
@@ -444,6 +452,11 @@ object Start extends SimpleSwingApplication {
         s"""<html>
             <head>
             <style>
+            body {
+              background-color: aliceblue;
+              font-family: "Segoe UI","Roboto","Helvetica Neue", "Arial",sans-serif;
+              font-size: 14px;
+            }
             table {
               border-collapse: collapse;
             }
@@ -452,6 +465,9 @@ object Start extends SimpleSwingApplication {
             }
             th, td {
               border: 1px solid #e0e0e0;
+            }
+            .state-icon {
+              height: 16px
             }
             </style>
             </head>
@@ -463,9 +479,7 @@ object Start extends SimpleSwingApplication {
             </body>
            </html>
         """
-      val oldSize = users.preferredSize
       users.html = tableHTML
-      pack() // recompute preferred size
       def trayUserLine(u: UserRow) = {
         val stateText = userStateDisplay(u.currentState)._2
         if (u.currentState != "offline") {
@@ -498,10 +512,17 @@ object Start extends SimpleSwingApplication {
 
       notificationsList = ns ++ notificationsList
 
+//        <link href="tray.css" rel="stylesheet" />
       val notificationsTable =
+        //language=HTML
         s"""<html>
             <head>
             <style>
+            body {
+              background-color: ivory;
+              font-family: "Segoe UI","Roboto","Helvetica Neue", "Arial",sans-serif;
+              font-size: 12px;
+            }
             table {
               border-collapse: collapse;
             }
@@ -588,8 +609,6 @@ object Start extends SimpleSwingApplication {
 
   // override, we do not want to show the window when started
   override def startup(args: Array[String]): Unit = {
-    val t = top
-    if (t.size == new Dimension(0,0)) t.pack()
     //t.open()
   }
 
