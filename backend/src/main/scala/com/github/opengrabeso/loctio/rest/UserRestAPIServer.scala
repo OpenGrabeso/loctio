@@ -68,7 +68,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
     val table = common.UserState.userTable(userAuth.login, false, us)
 
     def getUserStatusIcon(state: String) = {
-      s"<img class='state-icon' src='static/user-$state.ico'></img>"
+      s"<img class='state icon' src='static/user-$state.ico'></img>"
     }
 
     def displayTime(t: ZonedDateTime) = {
@@ -79,7 +79,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
       //language=HTML
       s"""<tr>
            <td>${getUserStatusIcon(row.currentState)}</td>
-           <td>${row.login}</td>
+           <td class="username"><a href="https://www.github.com/${row.login}">${row.login}</a></td>
            <td>${row.location}</td>
            <td>${if (row.currentState != "online") displayTime(row.lastTime) else ""}</td>
            </tr>
@@ -171,6 +171,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               <link href="static/tray.css" rel="stylesheet" />
               </head>
               <body class="notifications">
+                <p><a href="https://www.github.com/notifications">GitHub notifications</a></p>
                 <table>
                 ${ns.map(notificationHTML).mkString}
                 </table>

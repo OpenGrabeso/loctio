@@ -34,6 +34,12 @@ th, td {
     color: olive;
 }
 
-.state-icon {
-    height: 16px
+.icon {
+    height: 16px;
+    width: 16px
+}
+
+.username a:link {
+    text-decoration: none;
+    color: black;
 }
