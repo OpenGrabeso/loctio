@@ -151,9 +151,6 @@ object Start extends SimpleSwingApplication {
 
   }
   def performLogin(token: String): Unit = {
-    if (loginName != "") { // remove previous information
-      mainFrame.setUsers(Seq.empty)
-    }
     usersReady = false
     loginName = ""
     server.at(global).flatMap(_.api.user(token).name).at(global).map(_._1).at(OnSwing).foreach { s =>
@@ -162,10 +159,10 @@ object Start extends SimpleSwingApplication {
       // request users regularly
       if (updateSchedule != null) updateSchedule.cancel()
       updateSchedule = system.scheduler.schedule(Duration(0, duration.MINUTES), Duration(1, duration.MINUTES)){
-        requestUsers.at(OnSwing).foreach { users =>
+        requestUsers.at(OnSwing).foreach { case (users, tooltip) =>
           if (token == cfg.token) { // ignore any pending futures with a different token
             usersReady = true
-            mainFrame.setUsers(users)
+            mainFrame.setUsers(users, tooltip)
           }
         }
       }(global)
@@ -415,66 +412,22 @@ object Start extends SimpleSwingApplication {
       common.UserState.smartAbsoluteTime(t.withZoneSameInstant(zone), fmtTime.format, fmtDate.format, fmtDayOfWeek.format)
     }
 
-
-    def setUsers(us: Seq[(String, LocationInfo)]): this.type = {
-      val table = common.UserState.userTable(loginName, false, us)
-
-      def userStateDisplay(state: String) = {
-        state match { // from https://www.alt-codes.net/circle-symbols
-          case "online" => ("green", "⚫")
-          case "offline" => ("gray", "⦾")
-          case "away" => ("yellow", "⦿")
-          case "busy" => ("red", "⚫")
+    private def replaceTime(in: String): String = {
+      def recurse(s: String): String = {
+        val Time = "(?s)(.*)<time>([^<]+)<\\/time>(.*)".r
+        s match {
+          case Time(prefix, time, postfix) =>
+            prefix + displayTime(ZonedDateTime.parse(time)) + recurse(postfix)
+          case _ =>
+            s
         }
       }
+      recurse(in)
+    }
 
-      def userStateHtml(state: String) = {
-        // consider using inline images (icons) instead
-        val (color, text) = userStateDisplay(state)
-        s"<span style='color: $color'>$text</span>"
-      }
-
-      def getUserStatusIcon(state: String) = {
-        s"<img class='state-icon' src='static/user-$state.ico'></img>"
-      }
-
-      def userRowHTML(row: common.model.UserRow) = {
-        //language=HTML
-        s"""<tr>
-           <td>${getUserStatusIcon(row.currentState)}</td>
-           <td>${row.login}</td>
-           <td>${row.location}</td>
-           <td>${if (row.currentState != "online") displayTime(row.lastTime) else ""}</td>
-           </tr>
-          """
-      }
-
-
-      val tableHTML = //language=HTML
-        s"""<html>
-            <head>
-            <link href="static/tray.css" rel="stylesheet" />
-            </head>
-            <body class="users">
-              <table>
-              <tr>${columns.map(c => s"<th>$c</th>").mkString}</tr>
-              ${table.map(userRowHTML).mkString}
-              </table>
-            </body>
-           </html>
-        """
-      users.html = tableHTML
-      def trayUserLine(u: UserRow) = {
-        val stateText = userStateDisplay(u.currentState)._2
-        if (u.currentState != "offline") {
-          s"$stateText ${u.login}: ${u.location}"
-        } else {
-          s"$stateText ${u.login}: ${displayTime(u.lastTime)}"
-        }
-      }
-      val onlineUsers = table.filter(u => u.login != loginName && u.lastTime.until(ZonedDateTime.now(), ChronoUnit.DAYS) < 7)
-      val statusText = onlineUsers.map(u => trayUserLine(u)).mkString("\n")
-      reportTray(statusText)
+    def setUsers(usHTML: String, statusText: String): this.type = {
+      users.html = replaceTime(usHTML)
+      reportTray(replaceTime(statusText))
       this
     }
 
@@ -592,7 +545,7 @@ object Start extends SimpleSwingApplication {
   def requestUsers = {
     userApi.at(global).flatMap(api =>
       publicIpAddress.at(global).flatMap(addr =>
-        api.listUsers(addr, "online")
+        api.trayUsersHTML(addr, "online")
       )
     )
   }

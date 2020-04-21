@@ -20,6 +20,10 @@ trait UserRestAPI {
   @PUT
   def setLocationName(login: String, location: String): Future[Seq[(String, LocationInfo)]]
 
+  // user table HTML, tray icon status text
+  @GET
+  def trayUsersHTML(ipAddress: String, state: String): Future[(String, String)]
+
   @POST
   @CustomBody
   def shutdown(data: RestString): Future[Unit]
