@@ -45,7 +45,7 @@ object UserState {
     }
     val now = ZonedDateTime.now()
     val since = t.until(now, ChronoUnit.MINUTES)
-    val daysSince = ChronoUnit.DAYS.between(t, now)
+    val daysSince = ChronoUnit.DAYS.between(t.toLocalDate, now.toLocalDate)
     if (since < 10) "5 min ago"
     else if (since < 60) s"${since / 10 * 10} min ago"
     else if (daysSince == 0) formatTime(roundTime(t))
@@ -56,6 +56,20 @@ object UserState {
     }
   }
 
+  def smartAbsoluteTime(
+    t: ZonedDateTime, formatTime: ZonedDateTime => String,
+    formatDate: ZonedDateTime => String,
+    formatDayOfWeek: ZonedDateTime => String
+  ): String = {
+    val now = ZonedDateTime.now()
+    val daysSince = ChronoUnit.DAYS.between(t.toLocalDate, now.toLocalDate)
+    if (daysSince == 0) formatTime(t)
+    else if (daysSince < 7) {
+      formatDayOfWeek(t) + " " + formatTime(t)
+    } else {
+      formatDate(t) + " " + formatTime(t)
+    }
+  }
 
   def userTable(currentUser: String, currentUserInvisible: Boolean, value: Seq[(String, LocationInfo)]) = {
     def userLowerThan(a: UserRow, b: UserRow): Boolean = {

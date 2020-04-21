@@ -38,6 +38,8 @@ object Start extends SimpleSwingApplication {
   private var usersReady = false
   private var updateSchedule: Cancellable = _
   private var notificationsSchedule: Cancellable = _
+  private var serverUrl: String = _
+
   var lastNotifications =  Option.empty[String]
 
   trait ServerUsed {
@@ -91,7 +93,7 @@ object Start extends SimpleSwingApplication {
       serverFound.trySuccess(ServerProduction)
     }
 
-    serverFound.future
+    serverFound.future.tap(_.foreach(s => serverUrl = s.url)) // TODO: make thread robust
   }
 
   def userApi: Future[rest.UserRestAPI] = if (cfg.token.nonEmpty) {
@@ -111,7 +113,6 @@ object Start extends SimpleSwingApplication {
   }
 
   def requestNotifications(token: String): Unit = {
-    import rest.github.DataWithHeaders
     if (notificationsSchedule != null) {
       notificationsSchedule.cancel()
       notificationsSchedule = null
@@ -123,45 +124,30 @@ object Start extends SimpleSwingApplication {
       }(OnSwing)
     }
 
-    def requestNext(headers: DataWithHeaders.Headers) = {
-      requestNextAfter(headers.xPollInterval.map(_.toInt).getOrElse(60))
-    }
-
-    githubApi(token).notifications.get(ifModifiedSince = lastNotifications.orNull).at(OnSwing).map { ns =>
-      println("Notifications " + ns.data.size)
-      mainFrame.addNotifications(ns.data)
-
-      lastNotifications = ns.headers.lastModified orElse lastNotifications
-      requestNext(ns.headers)
-
-    }.failed.at(OnSwing).foreach {
-      case rest.github.DataWithHeaders.HttpErrorExceptionWithHeaders(ex, headers) =>
-        // expected - this mean nothing had changed and there is nothing to do
-        requestNext(headers)
-        if (ex.code != 304) { // // 304 is expected - this mean nothing had changed and there is nothing to do
-          println(s"Notifications failed $ex")
-        }
-      case ex  =>
-        requestNextAfter(60)
-        println(s"Notifications failed $ex")
-
+    userApi.at(global).flatMap(_.trayNotificationsHTML()).at(OnSwing).map { case (notificationsHTML, notifyUser, nextAfter) =>
+      if (notificationsHTML != "") {
+        mainFrame.addNotifications(notificationsHTML, notifyUser)
+      }
+      requestNextAfter(nextAfter)
+    }.failed.at(OnSwing).foreach { ex =>
+      requestNextAfter(60)
+      println(s"Notifications failed $ex")
     }
 
   }
   def performLogin(token: String): Unit = {
     usersReady = false
     loginName = ""
-    mainFrame.setUsers(Seq.empty)
     server.at(global).flatMap(_.api.user(token).name).at(global).map(_._1).at(OnSwing).foreach { s =>
       loginName = s
       println(s"Login done $s")
       // request users regularly
       if (updateSchedule != null) updateSchedule.cancel()
       updateSchedule = system.scheduler.schedule(Duration(0, duration.MINUTES), Duration(1, duration.MINUTES)){
-        requestUsers.at(OnSwing).foreach { users =>
+        requestUsers.at(OnSwing).foreach { case (users, tooltip) =>
           if (token == cfg.token) { // ignore any pending futures with a different token
             usersReady = true
-            mainFrame.setUsers(users)
+            mainFrame.setUsers(users, tooltip)
           }
         }
       }(global)
@@ -193,6 +179,9 @@ object Start extends SimpleSwingApplication {
   private def openWindow(location: Point): Unit = {
     // place the window a bit above the mouse - this avoid conflicting with the menu
     if (usersReady) {
+
+      if (mainFrame.size == new Dimension(0,0)) mainFrame.pack()
+
       if (!mainFrame.visible) {
         placeFrameAbove(mainFrame, location)
       }
@@ -253,7 +242,7 @@ object Start extends SimpleSwingApplication {
           val item = new JMenuItem(title)
           object listener extends ActionListener {
             def actionPerformed(e: ActionEvent) = {
-              action(MouseInfo.getPointerInfo.getLocation)
+              action(java.awt.MouseInfo.getPointerInfo.getLocation)
             }
           }
           item.addActionListener(listener)
@@ -292,7 +281,7 @@ object Start extends SimpleSwingApplication {
 
         // note: this does not work on Java 8 (see https://bugs.openjdk.java.net/browse/JDK-8146537)
         trayIcon.addActionListener { e =>
-          openWebGitHub()
+          openWindow(java.awt.MouseInfo.getPointerInfo.getLocation)
         }
 
 
@@ -369,15 +358,14 @@ object Start extends SimpleSwingApplication {
 
     title = appName
 
-    val users = new Label()
-    users.font = users.font.deriveFont(users.font.getSize2D * 1.2f)
+    val users = new HtmlPanel(serverUrl)
 
-    val notifications = new Label() {
+    val notifications = new HtmlPanel(serverUrl) {
       //preferredSize= new Dimension(260, 800) // allow narrow size so that label content is wrapped if necessary
       listenTo(mouse.clicks)
       reactions += {
         case e: MouseClicked if e.peer.getButton == 1 =>
-          openWebGitHub()
+          openWindow(java.awt.MouseInfo.getPointerInfo.getLocation)
       }
     }
 
@@ -387,8 +375,8 @@ object Start extends SimpleSwingApplication {
       new ScrollPane(users),
       new ScrollPane(notifications)
     ).tap { pane =>
-      pane.preferredSize = new Dimension(300, 600)
-      pane.resizeWeight = 0
+      pane.preferredSize = new Dimension(330, 600)
+      pane.resizeWeight = 0.3
     }
 
     contents = splitPane
@@ -404,128 +392,45 @@ object Start extends SimpleSwingApplication {
     private def displayTime(t: ZonedDateTime) = {
       common.UserState.smartTime(t.withZoneSameInstant(zone), fmtTime.format, fmtDate.format, fmtDayOfWeek.format)
     }
+    private def displayMessageTime(t: ZonedDateTime) = {
+      common.UserState.smartAbsoluteTime(t.withZoneSameInstant(zone), fmtTime.format, fmtDate.format, fmtDayOfWeek.format)
+    }
 
-
-    def setUsers(us: Seq[(String, LocationInfo)]): this.type = {
-      val table = common.UserState.userTable(loginName, false, us)
-
-      def userStateDisplay(state: String) = {
-        state match { // from https://www.alt-codes.net/circle-symbols
-          case "online" => ("green", "⚫")
-          case "offline" => ("gray", "⦾")
-          case "away" => ("yellow", "⦿")
-          case "busy" => ("red", "⚫")
+    private def replaceTime(in: String, displayFunc: ZonedDateTime => String): String = {
+      def recurse(s: String): String = {
+        val Time = "(?s)(.*)<time>([^<]+)<\\/time>(.*)".r
+        s match {
+          case Time(prefix, time, postfix) =>
+            recurse(prefix + displayFunc(ZonedDateTime.parse(time)) + postfix)
+          case _ =>
+            s
         }
       }
+      recurse(in)
+    }
 
-      def userStateHtml(state: String) = {
-        // consider using inline images (icons) instead
-        val (color, text) = userStateDisplay(state)
-        s"<span style='color: $color'>$text</span>"
-      }
-
-      def userRowHTML(row: common.model.UserRow) = {
-        //language=HTML
-        s"""<tr>
-           <td>${userStateHtml(row.currentState)}</td>
-           <td>${row.login}</td>
-           <td>${row.location}</td>
-           <td>${if (row.currentState != "online") displayTime(row.lastTime) else ""}</td>
-           </tr>
-          """
-      }
-
-
-      val tableHTML = //language=HTML
-        s"""<html>
-            <head>
-            <style>
-            table {
-              border-collapse: collapse;
-            }
-            table {
-              border: 1px none #ff0000;
-            }
-            th, td {
-              border: 1px solid #e0e0e0;
-            }
-            </style>
-            </head>
-            <body>
-              <table>
-              <tr>${columns.map(c => s"<th>$c</th>").mkString}</tr>
-              ${table.map(userRowHTML).mkString}
-              </table>
-            </body>
-           </html>
-        """
-      val oldSize = users.preferredSize
-      users.text = tableHTML
-      pack() // recompute preferred size
-      if (oldSize.height != users.preferredSize.height) {
-        splitPane.dividerLocation = (users.preferredSize.height + 10) min 300
-      }
-      def trayUserLine(u: UserRow) = {
-        val stateText = userStateDisplay(u.currentState)._2
-        if (u.currentState != "offline") {
-          s"$stateText ${u.login}: ${u.location}"
-        } else {
-          s"$stateText ${u.login}: ${displayTime(u.lastTime)}"
-        }
-      }
-      val onlineUsers = table.filter(u => u.login != loginName && u.lastTime.until(ZonedDateTime.now(), ChronoUnit.DAYS) < 7)
-      val statusText = onlineUsers.map(u => trayUserLine(u)).mkString("\n")
-      reportTray(statusText)
+    def setUsers(usHTML: String, statusText: String): this.type = {
+      users.html = replaceTime(usHTML, displayTime)
+      reportTray(replaceTime(statusText, displayTime))
       this
     }
 
     def clearNotifications(): this.type = {
       notificationsList = Seq.empty
-      addNotifications(Seq.empty) // update the Swing component
+      addNotifications("", Seq.empty) // update the Swing component
       this
     }
 
-    def addNotifications(ns: Seq[Notification]): this.type = {
+    def addNotifications(html: String, notifyUser: Seq[String]): this.type = {
 
-      def notificationHTML(n: Notification) = {
-        //language=HTML
-        s"""
-        <tr><td><b>${n.subject.title}</b><br>
-        ${n.repository.full_name} ${displayTime(n.updated_at)}</td></tr>
-         """
+      if (html.nonEmpty) {
+        notifications.html = replaceTime(html, displayMessageTime)
+        pack()
       }
 
-      notificationsList = ns ++ notificationsList
-
-      val notificationsTable =
-        s"""<html>
-            <head>
-            <style>
-            table {
-              border-collapse: collapse;
-            }
-            table {
-              border: 1px none #ff0000;
-            }
-            th, td {
-              border: 1px solid #e0e0e0;
-            }
-            </style>
-            </head>
-            <body>
-              <table>
-              ${notificationsList.map(notificationHTML).mkString}
-              </table>
-            </body>
-           </html>
-        """
-
-      notifications.text = notificationsTable
-      pack()
-
       // avoid flooding the notification area in case the user has many notifications
-      for (n <- ns.take(5).reverse) { // reverse to display oldest first
-        Tray.message(n.subject.title)
+      for (n <- notifyUser) { // reverse to display oldest first
+        Tray.message(n)
       }
 
       this
@@ -571,6 +476,9 @@ object Start extends SimpleSwingApplication {
                 cfg = cfg.copy(token = tokenField.text)
                 Config.store(cfg)
                 performLogin(cfg.token)
+              } else {
+                // refresh
+                performLogin(cfg.token)
               }
               dialog.close()
           }
@@ -587,8 +495,6 @@ object Start extends SimpleSwingApplication {
 
   // override, we do not want to show the window when started
   override def startup(args: Array[String]): Unit = {
-    val t = top
-    if (t.size == new Dimension(0,0)) t.pack()
     //t.open()
   }
 
@@ -604,7 +510,7 @@ object Start extends SimpleSwingApplication {
   def requestUsers = {
     userApi.at(global).flatMap(api =>
       publicIpAddress.at(global).flatMap(addr =>
-        api.listUsers(addr, "online")
+        api.trayUsersHTML(addr, "online")
       )
     )
   }

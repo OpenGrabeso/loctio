@@ -24,11 +24,10 @@ class PageView(
   val s = SelectPageStyles
 
 
-  def getUserStatusIcon(state: String, time: ZonedDateTime) = {
-    val displayState = common.UserState.getEffectiveUserStatus(state, time)
+  def getUserStatusIcon(state: String) = {
     img(
       s.stateIcon,
-      src := "static/user-" + displayState + ".ico",
+      src := "static/user-" + state + ".ico",
     )
   }
 
@@ -97,7 +96,7 @@ class PageView(
     // value is a callback
     type DisplayAttrib = TableFactory.TableAttrib[UserRow]
     val attribs = Seq[DisplayAttrib](
-      TableFactory.TableAttrib("", (ar, _, _) => Seq[Modifier](s.statusTd, getUserStatusIcon(ar.currentState, ar.lastTime).render)),
+      TableFactory.TableAttrib("", (ar, _, _) => Seq[Modifier](s.statusTd, getUserStatusIcon(ar.currentState).render)),
       TableFactory.TableAttrib("User", (ar, _, _) => ar.login.render),
       TableFactory.TableAttrib("Location", (ar, _, _) => ar.location.render),
       TableFactory.TableAttrib(
