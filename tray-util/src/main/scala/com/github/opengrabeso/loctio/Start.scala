@@ -411,6 +411,9 @@ object Start extends SimpleSwingApplication {
     private def displayTime(t: ZonedDateTime) = {
       common.UserState.smartTime(t.withZoneSameInstant(zone), fmtTime.format, fmtDate.format, fmtDayOfWeek.format)
     }
+    private def displayMessageTime(t: ZonedDateTime) = {
+      common.UserState.smartAbsoluteTime(t.withZoneSameInstant(zone), fmtTime.format, fmtDate.format, fmtDayOfWeek.format)
+    }
 
 
     def setUsers(us: Seq[(String, LocationInfo)]): this.type = {
@@ -487,7 +490,7 @@ object Start extends SimpleSwingApplication {
         //language=HTML
         s"""
         <tr><td><b>${n.subject.title}</b><br/>
-        ${n.repository.full_name} ${displayTime(n.updated_at)}</td></tr>
+        ${n.repository.full_name} ${displayMessageTime(n.updated_at)}</td></tr>
          """
       }
 
