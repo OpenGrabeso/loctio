@@ -432,8 +432,7 @@ object Start extends SimpleSwingApplication {
       }
 
       def getUserStatusIcon(state: String) = {
-        //s"""<img class="state-icon" src="user-$state.ico"></img>"""
-        s"<img class='state-icon' src='${serverUrl}//static/user-$state.ico'></img>"
+        s"<img class='state-icon' src='user-$state.ico'></img>"
       }
 
       def userRowHTML(row: common.model.UserRow) = {

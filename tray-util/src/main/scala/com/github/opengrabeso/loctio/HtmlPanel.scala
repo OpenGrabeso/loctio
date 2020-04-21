@@ -11,17 +11,17 @@ object HtmlPanel {
   class UserAgent(baseUri: String) extends NaiveUserAgent {
     assert(baseUri != null)
     private def serverUri(x: String) = baseUri + "/static/" + x
-    override def openStream(uri: String) = {
-      // allow only whitelisted resource
+
+    override def resolveURI(uri: String) = {
+      // allow only whitelisted resources
       val Icons = "user-[a-z]+\\.ico".r
       uri match {
         case "tray.css" =>
-          super.openStream(serverUri(uri))
+          serverUri(uri)
         case Icons() =>
-          super.openStream(serverUri(uri))
+          serverUri(uri)
         case _ =>
-          super.openStream(uri) // TODO: disable
-          //throw new IllegalAccessError("Resource $uri is not whitelisted")
+          null
       }
     }
   }
