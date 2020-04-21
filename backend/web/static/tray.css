@@ -1,0 +1,28 @@
+/* Stylesheet used for the Tray application */
+
+body.users {
+    font-family: "Segoe UI","Roboto","Helvetica Neue", "Arial",sans-serif;
+}
+body.users {
+    background-color: aliceblue;
+    font-size: 14px;
+}
+body.notifications {
+    background-color: ivory;
+    font-family: "Segoe UI","Roboto","Helvetica Neue", "Arial",sans-serif;
+    font-size: 12px;
+}
+table {
+    border-collapse: collapse;
+    background-color: white;
+}
+table {
+    border: 1px none #ff0000;
+}
+th, td {
+    border: 1px solid #e0e0e0;
+}
+
+.state-icon {
+    height: 16px
+}

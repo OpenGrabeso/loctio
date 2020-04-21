@@ -10,20 +10,6 @@ import scala.swing.Panel
 object HtmlPanel {
   class UserAgent(baseUri: String) extends NaiveUserAgent {
     assert(baseUri != null)
-    private def serverUri(x: String) = baseUri + "/static/" + x
-
-    override def resolveURI(uri: String) = {
-      // allow only whitelisted resources
-      val Icons = "user-[a-z]+\\.ico".r
-      uri match {
-        case "tray.css" =>
-          serverUri(uri)
-        case Icons() =>
-          serverUri(uri)
-        case _ =>
-          null
-      }
-    }
   }
 }
 
@@ -36,7 +22,7 @@ class HtmlPanel(baseUri: String) extends Panel {
   def html: String = throw new UnsupportedOperationException("HTML document is write only")
   def html_=(text: String): Unit = {
     val is = new ByteArrayInputStream(text.getBytes)
-    val url = "loctio://" // invalid URL
-    peer.setDocument(is, url)
+    val url = baseUri
+    peer.setDocument(is, url + "/")
   }
 }

@@ -432,7 +432,7 @@ object Start extends SimpleSwingApplication {
       }
 
       def getUserStatusIcon(state: String) = {
-        s"<img class='state-icon' src='user-$state.ico'></img>"
+        s"<img class='state-icon' src='static/user-$state.ico'></img>"
       }
 
       def userRowHTML(row: common.model.UserRow) = {
@@ -450,27 +450,9 @@ object Start extends SimpleSwingApplication {
       val tableHTML = //language=HTML
         s"""<html>
             <head>
-            <style>
-            body {
-              background-color: aliceblue;
-              font-family: "Segoe UI","Roboto","Helvetica Neue", "Arial",sans-serif;
-              font-size: 14px;
-            }
-            table {
-              border-collapse: collapse;
-            }
-            table {
-              border: 1px none #ff0000;
-            }
-            th, td {
-              border: 1px solid #e0e0e0;
-            }
-            .state-icon {
-              height: 16px
-            }
-            </style>
+            <link href="static/tray.css" rel="stylesheet" />
             </head>
-            <body>
+            <body class="users">
               <table>
               <tr>${columns.map(c => s"<th>$c</th>").mkString}</tr>
               ${table.map(userRowHTML).mkString}
@@ -511,29 +493,13 @@ object Start extends SimpleSwingApplication {
 
       notificationsList = ns ++ notificationsList
 
-//        <link href="tray.css" rel="stylesheet" />
       val notificationsTable =
         //language=HTML
         s"""<html>
             <head>
-            <style>
-            body {
-              background-color: ivory;
-              font-family: "Segoe UI","Roboto","Helvetica Neue", "Arial",sans-serif;
-              font-size: 12px;
-            }
-            table {
-              border-collapse: collapse;
-            }
-            table {
-              border: 1px none #ff0000;
-            }
-            th, td {
-              border: 1px solid #e0e0e0;
-            }
-            </style>
+            <link href="static/tray.css" rel="stylesheet" />
             </head>
-            <body>
+            <body class="notifications">
               <table>
               ${notificationsList.map(notificationHTML).mkString}
               </table>
