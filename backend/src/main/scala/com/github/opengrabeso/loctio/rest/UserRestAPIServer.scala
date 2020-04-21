@@ -4,6 +4,7 @@ package rest
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 
+import com.softwaremill.sttp.HttpURLConnectionBackend
 import common.model._
 import io.udash.rest.raw.HttpErrorException
 
@@ -145,7 +146,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
   }
 
   def trayNotificationsHTML() = syncResponse {
-    val sttpBackend = io.udash.rest.DefaultSttpBackend()
+    val sttpBackend = HttpURLConnectionBackend()
     try {
       val gitHubAPI = new GitHubAPIClient(sttpBackend)
       implicit val ec = createEC() // avoid thread pool, we are responsible for shutting down any threads we have created
