@@ -373,7 +373,7 @@ object Start extends SimpleSwingApplication {
     panel.font = panel.font.deriveFont(panel.font.getSize2D * 1.2f)
 
     val notifications = new Label() {
-      preferredSize= new Dimension(260, 800) // allow narrow size so that label content is wrapped if necessary
+      //preferredSize= new Dimension(260, 800) // allow narrow size so that label content is wrapped if necessary
       listenTo(mouse.clicks)
       reactions += {
         case e: MouseClicked if e.peer.getButton == 1 =>
