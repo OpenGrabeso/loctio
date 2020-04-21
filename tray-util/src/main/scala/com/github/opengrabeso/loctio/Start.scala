@@ -200,8 +200,12 @@ object Start extends SimpleSwingApplication {
     }
   }
 
-  private def openWeb(location: Point): Unit = {
+  private def openWeb(): Unit = {
     Desktop.getDesktop.browse(new URL(s"https://${appName.toLowerCase}.appspot.com").toURI)
+  }
+
+  private def openWebGitHub(): Unit = {
+    Desktop.getDesktop.browse(new URL(s"https://www.github.com/notifications?query=is%3Aunread").toURI)
   }
 
   private def appExit() = {
@@ -258,7 +262,7 @@ object Start extends SimpleSwingApplication {
         }
 
         val openItem = addItem("Open...", openWindow)
-        addItem("Open web...", openWeb)
+        addItem("Open web...", _ => openWeb())
         popup.addSeparator()
         addItem("Login...", login)
         popup.addSeparator()
@@ -286,8 +290,15 @@ object Start extends SimpleSwingApplication {
           }
         }
 
+        // note: this does not work on Java 8 (see https://bugs.openjdk.java.net/browse/JDK-8146537)
+        trayIcon.addActionListener { e =>
+          openWebGitHub()
+        }
+
+
         try {
           tray.add(trayIcon)
+          trayIcon.setActionCommand("NotifyClicked")
         } catch  {
           case e: AWTException =>
             e.printStackTrace()
@@ -333,7 +344,9 @@ object Start extends SimpleSwingApplication {
 
     def message(message: String): Unit = {
       assert(SwingUtilities.isEventDispatchThread)
-      icon.foreach(_.displayMessage(appName, message, TrayIcon.MessageType.NONE))
+      icon.foreach { i =>
+        i.displayMessage(appName, message, TrayIcon.MessageType.NONE)
+      }
     }
 
     def changeState(icon: TrayIcon, s: String): Unit = {
@@ -364,7 +377,7 @@ object Start extends SimpleSwingApplication {
       listenTo(mouse.clicks)
       reactions += {
         case e: MouseClicked if e.peer.getButton == 1 =>
-          Desktop.getDesktop.browse(new URL(s"https://www.github.com/notifications?query=is%3Aunread").toURI)
+          openWebGitHub()
       }
     }
 
