@@ -24,6 +24,9 @@ trait UserRestAPI {
   @GET
   def trayUsersHTML(ipAddress: String, state: String): Future[(String, String)]
 
+  @GET
+  def trayNotificationsHTML(): Future[(String, Seq[String], Int)]
+
   @POST
   @CustomBody
   def shutdown(data: RestString): Future[Unit]

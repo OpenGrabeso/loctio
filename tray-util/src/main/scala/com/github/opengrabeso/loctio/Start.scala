@@ -113,7 +113,6 @@ object Start extends SimpleSwingApplication {
   }
 
   def requestNotifications(token: String): Unit = {
-    import rest.github.DataWithHeaders
     if (notificationsSchedule != null) {
       notificationsSchedule.cancel()
       notificationsSchedule = null
@@ -125,28 +124,14 @@ object Start extends SimpleSwingApplication {
       }(OnSwing)
     }
 
-    def requestNext(headers: DataWithHeaders.Headers) = {
-      requestNextAfter(headers.xPollInterval.map(_.toInt).getOrElse(60))
-    }
-
-    githubApi(token).notifications.get(ifModifiedSince = lastNotifications.orNull).at(OnSwing).map { ns =>
-      println("Notifications " + ns.data.size)
-      mainFrame.addNotifications(ns.data)
-
-      lastNotifications = ns.headers.lastModified orElse lastNotifications
-      requestNext(ns.headers)
-
-    }.failed.at(OnSwing).foreach {
-      case rest.github.DataWithHeaders.HttpErrorExceptionWithHeaders(ex, headers) =>
-        // expected - this mean nothing had changed and there is nothing to do
-        requestNext(headers)
-        if (ex.code != 304) { // // 304 is expected - this mean nothing had changed and there is nothing to do
-          println(s"Notifications failed $ex")
-        }
-      case ex  =>
-        requestNextAfter(60)
-        println(s"Notifications failed $ex")
-
+    userApi.at(global).flatMap(_.trayNotificationsHTML()).at(OnSwing).map { case (notificationsHTML, notifyUser, nextAfter) =>
+      if (notificationsHTML != "") {
+        mainFrame.addNotifications(notificationsHTML, notifyUser)
+      }
+      requestNextAfter(nextAfter)
+    }.failed.at(OnSwing).foreach { ex =>
+      requestNextAfter(60)
+      println(s"Notifications failed $ex")
     }
 
   }
@@ -374,7 +359,6 @@ object Start extends SimpleSwingApplication {
     title = appName
 
     val users = new HtmlPanel(serverUrl)
-    users.font = users.font.deriveFont(users.font.getSize2D * 1.2f)
 
     val notifications = new HtmlPanel(serverUrl) {
       //preferredSize= new Dimension(260, 800) // allow narrow size so that label content is wrapped if necessary
@@ -412,12 +396,12 @@ object Start extends SimpleSwingApplication {
       common.UserState.smartAbsoluteTime(t.withZoneSameInstant(zone), fmtTime.format, fmtDate.format, fmtDayOfWeek.format)
     }
 
-    private def replaceTime(in: String): String = {
+    private def replaceTime(in: String, displayFunc: ZonedDateTime => String): String = {
       def recurse(s: String): String = {
         val Time = "(?s)(.*)<time>([^<]+)<\\/time>(.*)".r
         s match {
           case Time(prefix, time, postfix) =>
-            prefix + displayTime(ZonedDateTime.parse(time)) + recurse(postfix)
+            recurse(prefix + displayFunc(ZonedDateTime.parse(time)) + postfix)
           case _ =>
             s
         }
@@ -426,49 +410,27 @@ object Start extends SimpleSwingApplication {
     }
 
     def setUsers(usHTML: String, statusText: String): this.type = {
-      users.html = replaceTime(usHTML)
-      reportTray(replaceTime(statusText))
+      users.html = replaceTime(usHTML, displayTime)
+      reportTray(replaceTime(statusText, displayTime))
       this
     }
 
     def clearNotifications(): this.type = {
       notificationsList = Seq.empty
-      addNotifications(Seq.empty) // update the Swing component
+      addNotifications("", Seq.empty) // update the Swing component
       this
     }
 
-    def addNotifications(ns: Seq[Notification]): this.type = {
+    def addNotifications(html: String, notifyUser: Seq[String]): this.type = {
 
-      def notificationHTML(n: Notification) = {
-        //language=HTML
-        s"""
-        <tr><td><b>${n.subject.title}</b><br/>
-        ${n.repository.full_name} ${displayMessageTime(n.updated_at)}</td></tr>
-         """
+      if (html.nonEmpty) {
+        notifications.html = replaceTime(html, displayMessageTime)
+        pack()
       }
 
-      notificationsList = ns ++ notificationsList
-
-      val notificationsTable =
-        //language=HTML
-        s"""<html>
-            <head>
-            <link href="static/tray.css" rel="stylesheet" />
-            </head>
-            <body class="notifications">
-              <table>
-              ${notificationsList.map(notificationHTML).mkString}
-              </table>
-            </body>
-           </html>
-        """
-
-      notifications.html = notificationsTable
-      pack()
-
       // avoid flooding the notification area in case the user has many notifications
-      for (n <- ns.take(5).reverse) { // reverse to display oldest first
-        Tray.message(n.subject.title)
+      for (n <- notifyUser) { // reverse to display oldest first
+        Tray.message(n)
       }
 
       this
@@ -513,6 +475,9 @@ object Start extends SimpleSwingApplication {
               if (tokenField.text.nonEmpty) {
                 cfg = cfg.copy(token = tokenField.text)
                 Config.store(cfg)
+                performLogin(cfg.token)
+              } else {
+                // refresh
                 performLogin(cfg.token)
               }
               dialog.close()

@@ -7,6 +7,11 @@ import java.time.temporal.ChronoUnit
 import common.model._
 import io.udash.rest.raw.HttpErrorException
 
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
+import scala.util.{Failure, Success}
+
 class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI with RestAPIUtils {
   import UserRestAPI._
 
@@ -137,5 +142,53 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
       }
     }
   }
+
+  def trayNotificationsHTML() = syncResponse {
+    implicit val ec = createEC()
+    // TODO: handle and pass ifModifiedSince, store and update user state
+    val r = GitHubAPIClient.api.authorized("Bearer " + userAuth.token).notifications.get().transform {
+      case Success(response) =>
+
+        val ns = response.data
+        def notificationHTML(n: common.model.github.Notification) = {
+          //language=HTML
+          s"""
+          <tr><td><span class="message title">${n.subject.title}</span><br/>
+            ${n.repository.full_name} <span class="message time"><time>${n.updated_at}</time></span></td></tr>
+           """
+        }
+
+        val notificationsTable =
+        //language=HTML
+          s"""<html>
+              <head>
+              <link href="static/tray.css" rel="stylesheet" />
+              </head>
+              <body class="notifications">
+                <table>
+                ${ns.map(notificationHTML).mkString}
+                </table>
+              </body>
+             </html>
+          """
+
+        // avoid flooding the notification area in case the user has many notifications
+        // TODO: take(0) is only before ifModifiedSince is implemented
+        val notifyUser = for (n <- ns.take(0).reverse) yield { // reverse to display oldest first
+          n.subject.title
+        }
+
+        val nextAfter = response.headers.xPollInterval.map(_.toInt).getOrElse(60)
+        Success(notificationsTable, notifyUser, nextAfter)
+      case Failure(rest.github.DataWithHeaders.HttpErrorExceptionWithHeaders(ex, headers)) =>
+        val nextAfter = headers.xPollInterval.map(_.toInt).getOrElse(60)
+        Success("", Seq.empty, nextAfter)
+      case Failure(ex) =>
+        Failure(ex)
+    }
+    // it would be nice to pass Future directly, but somehow it does not work - probably some Google App Engine limitation
+    Await.result(r, Duration(60, SECONDS))
+  }
+
 
 }
