@@ -1,6 +1,7 @@
 package com.github.opengrabeso.loctio
 
 import java.awt.Desktop
+import java.io.ByteArrayInputStream
 import java.net.URL
 import java.time.{ZoneId, ZonedDateTime}
 import java.time.format._
@@ -13,6 +14,9 @@ import com.github.opengrabeso.loctio.common.model.github.Notification
 import com.github.opengrabeso.loctio.common.model.{LocationInfo, UserRow}
 import com.github.opengrabeso.loctio.rest.github.AuthorizedAPI
 import javax.swing.SwingUtilities
+import org.w3c.dom.Document
+import org.xhtmlrenderer.simple.XHTMLPanel
+import org.xhtmlrenderer.swing.NaiveUserAgent
 import rest.{RestAPI, RestAPIClient}
 
 import scala.concurrent.duration.Duration
@@ -381,11 +385,25 @@ object Start extends SimpleSwingApplication {
       }
     }
 
+    class ScalaXHTMLPanel extends Panel {
+      lazy val uac = new NaiveUserAgent
+      override lazy val peer: XHTMLPanel = new XHTMLPanel(uac) with SuperMixin
+
+      def html: String = throw new UnsupportedOperationException("HTML document is write only")
+      def html_=(text: String): Unit = {
+        val is = new ByteArrayInputStream(text.getBytes)
+        val url = "loctio://" // invalid URL
+        peer.setDocument(is, url)
+      }
+    }
+
+    val html = new ScalaXHTMLPanel()
+
     val columns = Seq("", "User", "Location", "Last seen")
     val splitPane = new SplitPane(
       Orientation.Horizontal,
       new ScrollPane(users),
-      new ScrollPane(notifications)
+      new ScrollPane(html)
     ).tap { pane =>
       pane.preferredSize = new Dimension(300, 600)
       pane.resizeWeight = 0
@@ -490,7 +508,7 @@ object Start extends SimpleSwingApplication {
       def notificationHTML(n: Notification) = {
         //language=HTML
         s"""
-        <tr><td><b>${n.subject.title}</b><br>
+        <tr><td><b>${n.subject.title}</b><br/>
         ${n.repository.full_name} ${displayTime(n.updated_at)}</td></tr>
          """
       }
@@ -520,7 +538,7 @@ object Start extends SimpleSwingApplication {
            </html>
         """
 
-      notifications.text = notificationsTable
+      html.html = notificationsTable
       pack()
 
       // avoid flooding the notification area in case the user has many notifications
