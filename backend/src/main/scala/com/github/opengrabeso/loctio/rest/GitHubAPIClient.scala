@@ -14,10 +14,9 @@ import io.udash.rest.{RestException, SttpRestClient}
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
-object GitHubAPIClient { // TODO: DRY with GitHubAPIClient in trayUtil
-  implicit val sttpBackend = io.udash.rest.DefaultSttpBackend()
+class GitHubAPIClient(sttpBackend: SttpBackend[Future, Nothing]) { // TODO: DRY with GitHubAPIClient in trayUtil
+  private implicit val backend = sttpBackend
   val api: github.RestAPI = SttpRestClient[github.RestAPI]("https://api.github.com")
-  def apply(): github.RestAPI = api
 
   // adapted from io.udash.rest.SttpRestClient#fromSttpResponse
   // we cannot use it directly, as it is private there
