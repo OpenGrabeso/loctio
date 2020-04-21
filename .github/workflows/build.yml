@@ -1,0 +1,25 @@
+name: Build and Test (SBT)
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up JDK 1.8
+        uses: actions/setup-java@v1
+        with:
+          java-version: 1.8
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run tests
+        run: |
+          printf "realm=github\nhost=www.github.com\nuser=${{ secrets.BUILD_USERNAME }}\password=${{ secrets.BUILD_USERTOKEN }}" > ~/gihub.credentials
+          printf "[github]\n  actor=${{ secrets.BUILD_USERNAME }}\n  token=${{ secrets.BUILD_USERTOKEN }}" > ~/.gitconfig
+          sbt backend/test trayUtil/test backend/products jetty/compile
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUILD_USERNAME: ${{ secrets.BUILD_USERNAME }}
+          BUILD_USERTOKEN: ${{ secrets.BUILD_USERTOKEN }}

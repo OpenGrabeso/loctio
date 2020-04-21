@@ -2,11 +2,17 @@ import sbt.Keys.scalacOptions
 // shadow sbt-scalajs' crossProject and CrossType from Scala.js 0.6.x
 import sbtcrossproject.CrossPlugin.autoImport.{crossProject, CrossType}
 
-githubActor in ThisBuild := sys.env.getOrElse("GITHUB_USERNAME", "OpenGrabeso")
+githubOwner in ThisBuild:= "gamatron"
 
-githubTokenSource in ThisBuild := TokenSource.GitConfig("github.token") || TokenSource.Environment("GITHUB_USERTOKEN") || TokenSource.Environment("GITHUB_TOKEN")
+githubRepository in ThisBuild := "packages"
+
+githubTokenSource := TokenSource.GitConfig("github.token") || TokenSource.Environment("BUILD_USERTOKEN") || TokenSource.Environment("GITHUB_TOKEN")
+
+githubTokenSource in ThisBuild := TokenSource.GitConfig("github.token") || TokenSource.Environment("BUILD_USERTOKEN") || TokenSource.Environment("GITHUB_TOKEN")
 
 resolvers in ThisBuild += Resolver.githubPackages("OpenGrabeso", "packages")
+
+resolvers += Resolver.githubPackages("OpenGrabeso", "packages")
 
 lazy val commonSettings = Seq(
   organization := "com.github.opengrabeso",
@@ -17,6 +23,10 @@ lazy val commonSettings = Seq(
 
 lazy val jsCommonSettings = Seq(
   scalacOptions ++= Seq("-P:scalajs:sjsDefinedByDefault")
+)
+
+lazy val flyingSaucersSettings = Seq(
+  libraryDependencies += "org.xhtmlrenderer" % "flying-saucer-core" % "9.1.20-opengrabeso.4"
 )
 
 val udashVersion = "0.8.2"
@@ -94,10 +104,10 @@ lazy val trayUtil = (project in file("tray-util"))
   .settings(
     name := "LoctioStart",
     commonSettings,
+    flyingSaucersSettings,
     libraryDependencies += "com.typesafe.akka" %% "akka-http" % "10.0.9",
     libraryDependencies += "com.twelvemonkeys.imageio" % "imageio-bmp" % "3.5",
     libraryDependencies += "org.scala-lang.modules" %% "scala-swing" % "2.1.1",
-    libraryDependencies += "org.xhtmlrenderer" % "flying-saucer-core" % "9.1.20-opengrabeso.4",
     libraryDependencies ++= commonLibs ++ jvmLibs,
     assemblyJarName in assembly := "loctio-tray.jar",
     assemblyMergeStrategy in assembly := {
