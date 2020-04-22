@@ -208,16 +208,29 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           val addUnread = newUnread.diff(oldUnread)
 
           // download last comments for the new content
-          val newComments = addUnread.map { n =>
+          val newComments = addUnread.filter(_.subject.`type` == "Issue").map { n =>
             // the issue may have no comments
             import rest.github.EnhancedRestImplicits._
-            val issue = gitHubAPI.request[Issue](n.subject.url, userAuth.token)
-            val markdown = gitHubAPI.api.authorized("Bearer " + userAuth.token).markdown.markdown(issue.body).awaitNow
 
+            // if there is a comment, the only reason why we need to get the issue is to get its number (we need it for the link)
+            val issue = gitHubAPI.request[Issue](n.subject.url, userAuth.token)
+            val prefix = s"https://www.github.com/${n.repository.full_name}/issues/${issue.number}"
+            val comment = Option(n.subject.latest_comment_url).filter(_.nonEmpty).map(url => gitHubAPI.request[Comment](url, userAuth.token))
+            // if there is a last comment, obtain it, when not, use the issue
+            val (linkUrl, by, time, body) = comment.map { c =>
+              println(s"Get comment ${c.id}")
+              (prefix + "#issuecomment-" + c.id.toString, c.user.login, c.updated_at, c.body)
+            }.getOrElse {
+              // this does not seem to happen - it seems the issue is also accessible as a comment
+              println(s"Get issue ${issue.number}")
+              (prefix, issue.user.login, issue.updated_at, issue.body)
+            }
+
+            val markdown = gitHubAPI.api.authorized("Bearer " + userAuth.token).markdown.markdown(body).awaitNow
             n.subject.url -> CommentContent(
-              s"https://www.github.com/${n.repository.full_name}/issues/${issue.number}",
+              linkUrl,
               s"#${issue.number}",
-              markdown.data, issue.user.login, issue.updated_at
+              markdown.data, by, time
             )
           }
 
