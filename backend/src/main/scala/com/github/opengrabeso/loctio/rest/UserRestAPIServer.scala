@@ -263,7 +263,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                    <span class="message by">${commentHtml.author}</span>
                    <span class="message time"><time>${commentHtml.time}</time></span>
                    </td></tr>
-                   <tr><td class="notification body">${commentHtml.html}</td></tr>
+                   <tr><td class="notification body article-content">${commentHtml.html}</td></tr>
                    """
             }.getOrElse(header)
           }
@@ -273,6 +273,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
             s"""<html>
               <head>
               <link href="static/tray.css" rel="stylesheet" />
+              <link href="rest/issues.css" rel="stylesheet" />
               </head>
               <body class="notifications">
                 <p><a href="https://www.github.com/notifications">GitHub notifications</a></p>
@@ -331,6 +332,4 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
       sttpBackend.close()
     }
   }
-
-
 }
