@@ -22,4 +22,14 @@ object FutureAt {
   implicit class FutureOps[T](future: Future[T]) {
     def at(ec: ExecutionContext) = new AtOps(future)(ec)
   }
+
+  object executeNow extends ExecutionContext {
+    def execute(runnable: Runnable) = {
+      runnable.run()
+    }
+    def reportFailure(cause: Throwable) = {
+      cause.printStackTrace()
+    }
+
+  }
 }

@@ -5,6 +5,7 @@ import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 
 import com.softwaremill.sttp.HttpURLConnectionBackend
+import common.FileStore
 import common.model._
 import io.udash.rest.raw.HttpErrorException
 
@@ -12,7 +13,21 @@ import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
-import scala.concurrent.ExecutionContext.global
+import shared.FutureAt._
+import shared.ChainingSyntax._
+
+object UserRestAPIServer {
+  case class TraySession(
+    sessionStarted: ZonedDateTime, // used to decide when should be flush (reset) the session to perform a full update
+    lastModified: Option[String], // lastModified HTTP headers used for notifications optimization
+    lastPoll: ZonedDateTime, // last time when the user has polled notifications
+    currentMesages: Seq[common.model.github.Notification],
+    mostRecentNotified: Option[ZonedDateTime] // most recent notification display to the user
+  )
+
+}
+
+import UserRestAPIServer._
 
 class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI with RestAPIUtils {
   import UserRestAPI._
@@ -135,6 +150,8 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
     }.getOrElse(throw HttpErrorException(500, "User presence not found"))
   }
 
+  private val sessionFilename = FileStore.FullName("tray", userAuth.login)
+
   def shutdown(data: RestString) = syncResponse {
     println(s"Received ${userAuth.login} shutdown ${data.value}")
     // value other then now can be used for testing and debugging the protocol
@@ -142,25 +159,58 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
       Presence.getUser(userAuth.login).filter(_.state != "offline").foreach { p =>
         Presence.reportUser(userAuth.login, p.ipAddress, "offline")
       }
+      // TODO: use some reliable client identification
+      // we use shutdown for this, but shutdown may come from web as well
+      // we could also apply some heuristics (reset user which was not polling client
+      Storage.delete(sessionFilename)
     }
   }
 
   def trayNotificationsHTML() = syncResponse {
     val sttpBackend = HttpURLConnectionBackend()
     try {
+
       val gitHubAPI = new GitHubAPIClient(sttpBackend)
-      implicit val ec = createEC() // avoid thread pool, we are responsible for shutting down any threads we have created
-      // TODO: handle and pass ifModifiedSince, store and update user state
 
-      val r = gitHubAPI.api.authorized("Bearer " + userAuth.token).notifications.get().transform {
+      val session = Storage.load[TraySession](sessionFilename)
+      val now = ZonedDateTime.now()
+
+      // heuristics to handle missing shutdown
+      // user should be polling notification frequently (about once per minute).
+      val recentSession = session.filter { s =>
+        ChronoUnit.MINUTES.between(s.lastPoll, now) < 5 && // Long pause probably means the client was terminated and should get a fresh state
+        ChronoUnit.MINUTES.between(s.sessionStarted, now) < 120 // each two hours perform a full reset
+      }
+
+      val ifModifiedSince = recentSession.flatMap(_.lastModified).orNull
+
+      //println(s"notifications.get ${userAuth.login}: since $ifModifiedSince")
+
+      val r = gitHubAPI.api.authorized("Bearer " + userAuth.token).notifications.get(
+        ifModifiedSince,
+        //all = true
+      ).at(executeNow).transform {
         case Success(response) =>
+          val (newUnread, read) = response.data.partition(_.unread)
 
-          val ns = response.data
+          val oldUnread = recentSession.filter(_.lastModified.nonEmpty).map(_.currentMesages).getOrElse(Seq.empty)
+          val unread = if (oldUnread.nonEmpty) {
+            // remove any message reported as read (I do not think this ever happens, but if it would, we would handle it)
+            // add messages reported as unread, but only when they are not present yet, insert recent messages first
+            newUnread.diff(oldUnread) ++ oldUnread.diff(read)
+          } else newUnread
+
+          println(s"${userAuth.login}: since $ifModifiedSince new: ${newUnread.size}, read: ${read.size}, unread: ${unread.size}")
+          // response content seems inconsistent. Sometimes it contains mesages
+          // TODO: we may want to remove some previous notifications - verify if they are contained in the response
           def notificationHTML(n: common.model.github.Notification) = {
             //language=HTML
             s"""
           <tr><td><span class="message title">${n.subject.title}</span><br/>
-            ${n.repository.full_name} <span class="message time"><time>${n.updated_at}</time></span></td></tr>
+            ${n.repository.full_name}
+            <span class="message time"><time>${n.updated_at}</time></span>
+            <span class="message reason ${n.reason}">${n.reason}</span>
+           </td></tr>
            """
           }
 
@@ -173,28 +223,55 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               <body class="notifications">
                 <p><a href="https://www.github.com/notifications">GitHub notifications</a></p>
                 <table>
-                ${ns.map(notificationHTML).mkString}
+                ${unread.map(notificationHTML).mkString}
                 </table>
               </body>
              </html>
           """
 
+          // is it really sorted by updated_at, or some other (internal) update timestamp (e.g. when last_read_at is higher than updated_at?)
+          val mostRecentNofified = recentSession.flatMap(_.mostRecentNotified)
+          val newMostRecentNotified = unread.headOption.map(_.updated_at)
           // avoid flooding the notification area in case the user has many notifications
-          // TODO: take(0) is only before ifModifiedSince is implemented
-          val notifyUser = for (n <- ns.take(0).reverse) yield { // reverse to display oldest first
-            n.subject.title
-          }
+          // reverse to display oldest first
+          import common.Util._
+          val notifyUserAbout = mostRecentNofified.map { notifyFrom =>
+            // check newUnread only - old unread were already reported if necessary
+            newUnread.filter(_.updated_at > notifyFrom).tap { u =>
+              println(s"Take notified from $notifyFrom: ${u.size}, unread times: ${newUnread.map(_.updated_at)}")
+            }
+            // beware: two messages might have identical timestamps. Unlikely, but possible
+            // such message may have a notification skipped
+          }.getOrElse(newUnread).take(5).reverse
+
+          val notifyUser = notifyUserAbout.map(_.subject.title)
+
+          val newSession = TraySession(
+            recentSession.map(_.sessionStarted).getOrElse(now),
+            response.headers.lastModified,
+            now,
+            unread,
+            newMostRecentNotified
+          )
+          Storage.store(sessionFilename, newSession)
 
           val nextAfter = response.headers.xPollInterval.map(_.toInt).getOrElse(60)
           Success(notificationsTable, notifyUser, nextAfter)
         case Failure(rest.github.DataWithHeaders.HttpErrorExceptionWithHeaders(ex, headers)) =>
           val nextAfter = headers.xPollInterval.map(_.toInt).getOrElse(60)
+
+          for (s <- recentSession) { // update the session info to keep alive (prevent resetting)
+            Storage.store(sessionFilename, s.copy(lastPoll = now))
+          }
+
           Success("", Seq.empty, nextAfter)
         case Failure(ex) =>
           Failure(ex)
       }
       // it would be nice to pass Future directly, but somehow it does not work - probably some Google App Engine limitation
       Await.result(r, Duration(60, SECONDS))
+
+      //      trayNotificationsImpl(sttpBackend)
     } finally {
       sttpBackend.close()
     }
