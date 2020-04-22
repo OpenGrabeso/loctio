@@ -83,7 +83,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
     val table = common.UserState.userTable(userAuth.login, false, us)
 
     def getUserStatusIcon(state: String) = {
-      s"<img class='state icon' src='static/user-$state.ico'></img>"
+      s"<img class='state icon' src='static/small/user-$state.png'></img>"
     }
 
     def displayTime(t: ZonedDateTime) = {
