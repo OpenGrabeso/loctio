@@ -2,17 +2,9 @@ import sbt.Keys.scalacOptions
 // shadow sbt-scalajs' crossProject and CrossType from Scala.js 0.6.x
 import sbtcrossproject.CrossPlugin.autoImport.{crossProject, CrossType}
 
-githubOwner in ThisBuild:= "gamatron"
-
-githubRepository in ThisBuild := "packages"
-
-githubTokenSource := TokenSource.GitConfig("github.token") || TokenSource.Environment("BUILD_USERTOKEN") || TokenSource.Environment("GITHUB_TOKEN")
-
 githubTokenSource in ThisBuild := TokenSource.GitConfig("github.token") || TokenSource.Environment("BUILD_USERTOKEN") || TokenSource.Environment("GITHUB_TOKEN")
 
-resolvers in ThisBuild += Resolver.githubPackages("OpenGrabeso", "packages")
-
-resolvers += Resolver.githubPackages("OpenGrabeso", "packages")
+resolvers in ThisBuild += Resolver.githubPackages("OpenGrabeso")
 
 lazy val commonSettings = Seq(
   organization := "com.github.opengrabeso",
