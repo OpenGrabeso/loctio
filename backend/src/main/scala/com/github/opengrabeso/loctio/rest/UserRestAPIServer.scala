@@ -7,6 +7,7 @@ import java.time.temporal.ChronoUnit
 import com.softwaremill.sttp.HttpURLConnectionBackend
 import common.FileStore
 import common.model._
+import common.model.github._
 import io.udash.rest.raw.HttpErrorException
 
 import scala.concurrent.Await
@@ -17,11 +18,20 @@ import shared.FutureAt._
 import shared.ChainingSyntax._
 
 object UserRestAPIServer {
+  case class CommentContent(
+    linkUrl: String,
+    linkText: String,
+    html: String,
+    author: String,
+    time: ZonedDateTime
+  )
+
   case class TraySession(
     sessionStarted: ZonedDateTime, // used to decide when should be flush (reset) the session to perform a full update
     lastModified: Option[String], // lastModified HTTP headers used for notifications optimization
     lastPoll: ZonedDateTime, // last time when the user has polled notifications
-    currentMesages: Seq[common.model.github.Notification],
+    currentMesages: Seq[Notification],
+    lastComments: Map[String, CommentContent], // we use URL for identification, as this is sure to be stable for an issue
     mostRecentNotified: Option[ZonedDateTime] // most recent notification display to the user
   )
 
@@ -194,24 +204,55 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           val (newUnread, read) = response.data.partition(_.unread)
 
           val oldUnread = recentSession.filter(_.lastModified.nonEmpty).map(_.currentMesages).getOrElse(Seq.empty)
-          val unread = if (oldUnread.nonEmpty) {
-            // remove any message reported as read (I do not think this ever happens, but if it would, we would handle it)
-            // add messages reported as unread, but only when they are not present yet, insert recent messages first
-            newUnread.diff(oldUnread) ++ oldUnread.diff(read)
-          } else newUnread
+          // add messages reported as unread, but only when they are not present yet, insert recent messages first
+          val addUnread = newUnread.diff(oldUnread)
+
+          // download last comments for the new content
+          val newComments = addUnread.map { n =>
+            // the issue may have no comments
+            import rest.github.EnhancedRestImplicits._
+            val issue = gitHubAPI.request[Issue](n.subject.url, userAuth.token)
+            val markdown = gitHubAPI.api.authorized("Bearer " + userAuth.token).markdown.markdown(issue.body).awaitNow
+
+            n.subject.url -> CommentContent(
+              s"https://www.github.com/${n.repository.full_name}/issues/${issue.number}",
+              s"#${issue.number}",
+              markdown.data, issue.user.login, issue.updated_at
+            )
+          }
+
+          // remove any message reported as read (I do not think this ever happens, but if it would, we would handle it)
+          val unread = addUnread ++ oldUnread.diff(read)
+          val comments = recentSession.map(_.lastComments).getOrElse(Map.empty) ++ newComments
 
           println(s"${userAuth.login}: since $ifModifiedSince new: ${newUnread.size}, read: ${read.size}, unread: ${unread.size}")
-          // response content seems inconsistent. Sometimes it contains mesages
-          // TODO: we may want to remove some previous notifications - verify if they are contained in the response
-          def notificationHTML(n: common.model.github.Notification) = {
+          // response content seems inconsistent. Sometimes it contains messages
+          def notificationHTML(n: common.model.github.Notification, comments: Map[String, CommentContent]) = {
             //language=HTML
-            s"""
-          <tr><td><span class="message title">${n.subject.title}</span><br/>
-            ${n.repository.full_name}
-            <span class="message time"><time>${n.updated_at}</time></span>
-            <span class="message reason ${n.reason}">${n.reason}</span>
-           </td></tr>
-           """
+            val comment = comments.get(n.subject.url)
+            def ifComment(s: CommentContent => String) = comment.map(s).getOrElse("")
+            val header = s"""
+            <tr><td class="notification header">
+              <span class="message link">
+              ${ifComment(c => s"<a href='${c.linkUrl}'>${c.linkText}</a>")}
+              </span>
+
+              <span class="message title">${n.subject.title}</span><br/>
+              ${n.repository.full_name}
+              <span class="message time"><time>${n.updated_at}</time></span>
+              <span class="message reason ${n.reason}">${n.reason}</span>
+             </td></tr>
+             """
+            comments.get(n.subject.url).map { commentHtml =>
+              header ++
+                s"""
+                   <tr><td class="notification signature">
+                   <span class="message by">${commentHtml.author}</span>
+                   <span class="message time"><time>${commentHtml.time}</time></span>
+                   </td></tr>
+                   <tr><td class="notification body">${commentHtml.html}</td></tr>
+                   """
+            }.getOrElse(header)
           }
 
           val notificationsTable =
@@ -223,7 +264,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               <body class="notifications">
                 <p><a href="https://www.github.com/notifications">GitHub notifications</a></p>
                 <table>
-                ${unread.map(notificationHTML).mkString}
+                ${unread.map(notificationHTML(_, comments)).mkString}
                 </table>
               </body>
              </html>
@@ -251,6 +292,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
             response.headers.lastModified,
             now,
             unread,
+            comments,
             newMostRecentNotified
           )
           Storage.store(sessionFilename, newSession)

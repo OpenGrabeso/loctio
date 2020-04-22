@@ -65,10 +65,23 @@ assign, author, comment, invitation, manual, mention, review_requested, security
     display: none;
 }
 
+.notification.header {
+    background-color: #e6eaf5;
+}
+
+.notification.body {
+
+}
+
+.notification.signature {
+    background-color: #fffff5;
+}
+
 .icon {
     height: 16px;
     width: 16px
 }
+
 
 .username a:link {
     text-decoration: none;
