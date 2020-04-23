@@ -153,6 +153,7 @@ lazy val backend = (project in file("backend"))
       "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion,
 
       "com.fasterxml" % "aalto-xml" % "1.0.0",
+      "org.jsoup" % "jsoup" % "1.13.1",
 
       //"org.webjars" % "webjars-locator-core" % "0.39",
 

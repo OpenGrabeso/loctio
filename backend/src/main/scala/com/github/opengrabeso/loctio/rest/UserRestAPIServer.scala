@@ -230,7 +230,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
             n.subject.url -> CommentContent(
               linkUrl,
               s"#${issue.number}",
-              markdown.data, by, time
+              HTMLUtils.xhtml(markdown.data), by, time
             )
           }
 
