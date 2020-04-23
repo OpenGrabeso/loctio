@@ -1,6 +1,7 @@
 package com.github.opengrabeso.loctio
 
 import java.awt.Desktop
+import java.awt.event.{KeyAdapter, KeyEvent, MouseAdapter, MouseEvent, MouseWheelEvent}
 import java.net.URL
 import java.time.{ZoneId, ZonedDateTime}
 import java.time.format._
@@ -370,6 +371,25 @@ object Start extends SimpleSwingApplication {
     assert(SwingUtilities.isEventDispatchThread)
 
     title = appName
+
+    def userActive() = {
+      println("User active")
+    }
+    object watchMouse extends MouseAdapter {
+      override def mousePressed(e: MouseEvent) = userActive()
+      override def mouseReleased(e: MouseEvent) = userActive()
+      override def mouseWheelMoved(e: MouseWheelEvent) = userActive()
+      override def mouseMoved(e: MouseEvent) = userActive()
+    }
+    object watchKeyboard extends KeyAdapter {
+      override def keyPressed(e: KeyEvent) = userActive()
+      override def keyReleased(e: KeyEvent) = userActive()
+    }
+    peer.addMouseListener(watchMouse)
+    peer.addMouseMotionListener(watchMouse)
+    peer.addMouseWheelListener(watchMouse)
+    peer.addKeyListener(watchKeyboard)
+
 
     val users = new HtmlPanel(serverUrl)
 
