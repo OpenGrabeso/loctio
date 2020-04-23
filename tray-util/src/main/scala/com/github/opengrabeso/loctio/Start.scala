@@ -225,6 +225,10 @@ object Start extends SimpleSwingApplication {
     }
   }
 
+  private def userState(state: String): Unit = {
+    println(s"state $state")
+  }
+
   private object Tray {
     import java.awt.{TrayIcon, SystemTray, Image}
     import java.awt.event._
@@ -258,6 +262,13 @@ object Start extends SimpleSwingApplication {
 
         val openItem = new SimpleMenuItem("Open...", openWindow())
         val popup = new PopupMenu {
+          contents += new Menu("State") {
+            contents += new SimpleMenuItem("Online", userState("online"), "/user-online.ico", iconSize)
+            contents += new SimpleMenuItem("Invisible", userState("invisible"), "/user-invisible.ico", iconSize)
+            contents += new SimpleMenuItem("Busy", userState("busy"), "/user-busy.ico", iconSize)
+            contents += new SimpleMenuItem("Offline", userState("offline"), "/user-offline.ico", iconSize)
+          }
+          contents += new Separator
           contents += openItem
           contents += new SimpleMenuItem("Open web...", openWeb())
           contents += new Separator
