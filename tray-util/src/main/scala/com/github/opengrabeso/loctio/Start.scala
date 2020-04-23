@@ -13,6 +13,7 @@ import com.github.opengrabeso.loctio.common.model.github.Notification
 import com.github.opengrabeso.loctio.rest.github.AuthorizedAPI
 import javax.swing.SwingUtilities
 import javax.imageio.ImageIO
+import java.awt.{TrayIcon, SystemTray, Image}
 import rest.{RestAPI, RestAPIClient}
 
 import scala.concurrent.duration.Duration
@@ -241,7 +242,26 @@ object Start extends SimpleSwingApplication {
     }
   }
 
+  def loadScaledImages(name: String, dimension: Seq[Dimension]): Seq[Image] = {
+    val is = getClass.getResourceAsStream(name)
+    try {
+      val image = ImageIO.read(is)
+      for (d <- dimension) yield {
+        image.getScaledInstance(d.width, d.height, Image.SCALE_SMOOTH)
+      }
+    } finally {
+      is.close()
+    }
+  }
+
+  def iconImages(iconName: String) = {
+    val images = loadScaledImages(iconName, Seq(16, 24, 32, 48, 64).map(s => new Dimension(s, s)))
+    import collection.JavaConverters._
+    images.asJava
+
+  }
   private def userState(state: String): Unit = {
+    assert(SwingUtilities.isEventDispatchThread)
     println(s"state $state")
     (state, cfg.state) match {
       case ("offline", x) if x != "offline" =>
@@ -252,12 +272,13 @@ object Start extends SimpleSwingApplication {
     }
     cfg = cfg.copy(state = state)
     Config.store(cfg)
-    Tray.setImage(s"/user-$state.ico")
 
+    val iconName = s"/user-$state.ico"
+    Tray.setImage(iconName)
+    mainFrame.peer.setIconImages(iconImages(iconName))
   }
 
   private object Tray {
-    import java.awt.{TrayIcon, SystemTray, Image}
     import java.awt.event._
 
     import javax.swing.UIManager
@@ -265,24 +286,28 @@ object Start extends SimpleSwingApplication {
     private var state: String = ""
     private var trayIcon: TrayIcon = _
 
-    private def loadIconImage(name: String) = {
-      val tray = SystemTray.getSystemTray
-      val iconSize = tray.getTrayIconSize
+    // for some strange reason calling the function did not work when placed outside of the Tray (silently stuck)
+    def loadScaledImage(name: String, dimension: Dimension) = {
       val is = getClass.getResourceAsStream(name)
-
       try {
         val image = ImageIO.read(is)
-        image.getScaledInstance(iconSize.width, iconSize.height, Image.SCALE_SMOOTH)
+        image.getScaledInstance(dimension.width, dimension.height, Image.SCALE_SMOOTH)
       } finally {
         is.close()
       }
     }
 
+    private def loadTrayIconImage(name: String) = {
+      val tray = SystemTray.getSystemTray
+      val iconSize = tray.getTrayIconSize
+      println(s"loadTrayIconImage $name")
+      loadScaledImage(name, iconSize)
+    }
+
     def setImage(name: String): Unit = {
       assert(SwingUtilities.isEventDispatchThread)
-      val imageSized = loadIconImage(name)
+      val imageSized = loadTrayIconImage(name)
       trayIcon.setImage(imageSized)
-
     }
 
     private def showImpl() = {
@@ -299,7 +324,7 @@ object Start extends SimpleSwingApplication {
         val tray = SystemTray.getSystemTray
         val iconSize = tray.getTrayIconSize
 
-        val imageSized = loadIconImage("/user-online.ico")
+        val imageSized = loadTrayIconImage("/user-online.ico")
         trayIcon = new TrayIcon(imageSized, appName)
 
         import java.awt.event.MouseAdapter
@@ -364,21 +389,6 @@ object Start extends SimpleSwingApplication {
       }
     }
 
-    private def removeImpl(icon: TrayIcon): Unit = {
-      assert(SwingUtilities.isEventDispatchThread)
-      if (SystemTray.isSupported) {
-        val tray = SystemTray.getSystemTray
-        tray.remove(icon)
-      }
-    }
-
-    private def changeStateImpl(icon: TrayIcon, s: String): Unit = {
-      assert(SwingUtilities.isEventDispatchThread)
-      state = s
-      val text = if (state.isEmpty) appName else state
-      icon.setToolTip(text)
-    }
-
     def swingInvokeAndWait[T](callback: => T): T = {
       if (SwingUtilities.isEventDispatchThread) {
         callback
@@ -394,20 +404,27 @@ object Start extends SimpleSwingApplication {
 
     def remove(icon: TrayIcon): Unit = {
       // wait to be sure the thread removing the icon is not terminated by exit before the removal is completed
-      swingInvokeAndWait(removeImpl(icon))
+      assert(SwingUtilities.isEventDispatchThread)
+      if (SystemTray.isSupported) {
+        val tray = SystemTray.getSystemTray
+        tray.remove(icon)
+      }
     }
 
     def message(message: String): Unit = {
       assert(SwingUtilities.isEventDispatchThread)
-      icon.foreach { i =>
-        i.displayMessage(appName, message, TrayIcon.MessageType.NONE)
+      if (SystemTray.isSupported) {
+        icon.foreach { i =>
+          i.displayMessage(appName, message, TrayIcon.MessageType.NONE)
+        }
       }
     }
 
     def changeState(icon: TrayIcon, s: String): Unit = {
-      OnSwing.future {
-        changeStateImpl(icon, s)
-      }
+      assert(SwingUtilities.isEventDispatchThread)
+      state = s
+      val text = if (state.isEmpty) appName else state
+      icon.setToolTip(text)
     }
   }
 
@@ -415,7 +432,6 @@ object Start extends SimpleSwingApplication {
 
   def reportTray(message: String): Unit = {
     assert(SwingUtilities.isEventDispatchThread)
-
     icon.foreach(Tray.changeState(_, message))
   }
 
@@ -423,6 +439,7 @@ object Start extends SimpleSwingApplication {
     assert(SwingUtilities.isEventDispatchThread)
 
     title = appName
+    peer.setIconImages(iconImages("/user-online.ico"))
 
     def userActive() = {
       println("User active")
