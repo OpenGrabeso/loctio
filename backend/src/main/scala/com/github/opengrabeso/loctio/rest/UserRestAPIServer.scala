@@ -90,7 +90,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
     val us = listUsersSync(ipAddress, state)
 
-    val table = common.UserState.userTable(userAuth.login, false, us)
+    val table = common.UserState.userTable(userAuth.login, state, us)
 
     def getUserStatusIcon(state: String) = {
       s"<img class='state icon' src='static/small/user-$state.png'></img>"
@@ -106,7 +106,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
            <td>${getUserStatusIcon(row.currentState)}</td>
            <td class="username"><a href="https://www.github.com/${row.login}">${row.login}</a></td>
            <td>${row.location}</td>
-           <td>${if (row.currentState != "online") displayTime(row.lastTime) else ""}</td>
+           <td>${if (row.currentState != "online" && row.currentState != "busy") displayTime(row.lastTime) else ""}</td>
            </tr>
           """
     }

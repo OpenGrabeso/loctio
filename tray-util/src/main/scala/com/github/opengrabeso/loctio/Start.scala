@@ -32,7 +32,7 @@ object Start extends SimpleSwingApplication {
 
   val exitEvent = Promise[Boolean]()
 
-  private var cfg = Config.load
+  private var cfg = Config.empty
   private var loginName = ""
   private var usersReady = false
   private var updateSchedule: Cancellable = _
@@ -111,11 +111,21 @@ object Start extends SimpleSwingApplication {
     frame.open()
   }
 
-  def requestNotifications(token: String): Unit = {
+  private def cancelNotifications(): Unit = {
     if (notificationsSchedule != null) {
       notificationsSchedule.cancel()
       notificationsSchedule = null
     }
+  }
+  private def cancelUserUpdates(): Unit = {
+    if (updateSchedule != null) {
+      updateSchedule.cancel()
+      updateSchedule = null
+    }
+  }
+
+  def requestNotifications(token: String): Unit = {
+    cancelNotifications()
 
     def requestNextAfter(seconds: Int) = {
       notificationsSchedule = system.scheduler.scheduleOnce(Duration(seconds, duration.SECONDS)){
@@ -134,19 +144,22 @@ object Start extends SimpleSwingApplication {
     }
 
   }
-  def performLogin(token: String): Unit = {
+
+  def performLogout(): Future[Unit] = {
+    cancelNotifications()
+    cancelUserUpdates()
+    sendShutdown()
+  }
+
+  def performLogin(token: String): Future[Unit] = {
     usersReady = false
     // if already logged in, report shutdown first so that we get complete notifications
-    val after = if (cfg.token.nonEmpty) {
-      sendShutdown()
-    } else Future.successful(())
-    after.at(OnSwing).foreach { _ =>
-      loginName = ""
-      server.at(global).flatMap(_.api.user(token).name).at(OnSwing).foreach { case (s, _) =>
+    loginName = ""
+    if (token != "") { // login with token == "" means log-out
+      server.at(global).flatMap(_.api.user(token).name).at(OnSwing).map { case (s, _) =>
         loginName = s
         println(s"Login done $s")
         // request users regularly
-        if (updateSchedule != null) updateSchedule.cancel()
         updateSchedule = system.scheduler.schedule(Duration(0, duration.MINUTES), Duration(1, duration.MINUTES)) {
           requestUsers.at(OnSwing).foreach { case (users, tooltip) =>
             if (token == cfg.token) { // ignore any pending futures with a different token
@@ -156,9 +169,10 @@ object Start extends SimpleSwingApplication {
           }
         }(global)
 
-        mainFrame.clearNotifications()
         requestNotifications(token)
       }
+    } else {
+      Future.successful(())
     }
   }
 
@@ -214,6 +228,7 @@ object Start extends SimpleSwingApplication {
   }
 
   private def sendShutdown(): Future[Unit] = {
+    println("Send shutdown")
     userApi.at(global).flatMap(_.shutdown(rest.UserRestAPI.RestString("now")))
   }
 
@@ -227,6 +242,16 @@ object Start extends SimpleSwingApplication {
 
   private def userState(state: String): Unit = {
     println(s"state $state")
+    (state, cfg.state) match {
+      case ("offline", x) if x != "offline" =>
+        performLogout()
+      case (x, "offline") if x != "offline" =>
+        performLogin(cfg.token)
+      case _ =>
+    }
+    cfg = cfg.copy(state = state)
+    Config.store(cfg)
+
   }
 
   private object Tray {
@@ -513,15 +538,18 @@ object Start extends SimpleSwingApplication {
         contents += new Button("OK") {
           reactions += {
             case event.ButtonClicked(_) =>
-              if (tokenField.text.nonEmpty) {
-                cfg = cfg.copy(token = tokenField.text)
-                Config.store(cfg)
+              val after = if (cfg.token.nonEmpty) {
+                performLogout()
+              } else Future.successful(())
+              after.at(OnSwing).foreach { _ =>
+                if (tokenField.text.nonEmpty) {
+                  cfg = cfg.copy(token = tokenField.text)
+                  Config.store(cfg)
+                }
+                // even when the user did not change the token, we perform a login to refresh
                 performLogin(cfg.token)
-              } else {
-                // refresh
-                performLogin(cfg.token)
+                dialog.close()
               }
-              dialog.close()
           }
         }
         contents += new Button("Cancel") {
@@ -539,21 +567,21 @@ object Start extends SimpleSwingApplication {
     //t.open()
   }
 
-  if (cfg.token.nonEmpty) {
-    OnSwing.future {
-      performLogin(cfg.token)
-    }
+  OnSwing.future {
+    cfg = Config.load
+    performLogin(cfg.token)
   }
 
   private val publicIpAddress = PublicIpAddress.get(global)
 
 
   def requestUsers = {
-    userApi.at(global).flatMap(api =>
+    userApi.at(global).flatMap { api =>
+      println(s"Request users ${cfg.state}")
       publicIpAddress.at(global).flatMap(addr =>
-        api.trayUsersHTML(addr, "online")
+        api.trayUsersHTML(addr, cfg.state)
       )
-    )
+    }
   }
 
 }

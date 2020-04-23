@@ -34,7 +34,7 @@ object Presence {
         val age = Duration.between(lastSeen, now).getSeconds
         // when seen in a last minute, always report as online
         // when one client has reported going offline, there still may be other clients running
-        val state = if (age < 70) "online" else d.state
+        val state = if (age < 70 && d.state == "offline") "online" else d.state
         //println(s"Report $login as $d")
         login -> LocationInfo(Locations.locationFromIpAddress(d.ipAddress), lastSeen, state)
       }

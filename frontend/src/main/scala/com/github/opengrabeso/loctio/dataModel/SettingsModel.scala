@@ -3,7 +3,7 @@ package com.github.opengrabeso.loctio.dataModel
 import io.udash.HasModelPropertyCreator
 import org.scalajs.dom
 
-case class SettingsModel(token: String = "", login: String = "", fullName: String = "", invisible: Boolean = false)
+case class SettingsModel(token: String = "", login: String = "", fullName: String = "", state: String = "online")
 
 object SettingsModel extends HasModelPropertyCreator[SettingsModel] {
 
@@ -11,7 +11,7 @@ object SettingsModel extends HasModelPropertyCreator[SettingsModel] {
   val ss = dom.window.sessionStorage
   val values = Map[String, (SettingsModel => String, (SettingsModel, String) => SettingsModel)](
     "loctio.token" -> (_.token, (m, s) => m.copy(token = s)),
-    "loctio.invisible" -> (_.invisible.toString, (m, s) => m.copy(invisible = s == "true")),
+    "loctio.state" -> (_.state.toString, (m, s) => m.copy(state = s)),
   )
 
   def load: SettingsModel = {
