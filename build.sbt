@@ -100,6 +100,7 @@ lazy val trayUtil = (project in file("tray-util"))
     libraryDependencies += "com.typesafe.akka" %% "akka-http" % "10.0.9",
     libraryDependencies += "com.twelvemonkeys.imageio" % "imageio-bmp" % "3.5",
     libraryDependencies += "org.scala-lang.modules" %% "scala-swing" % "2.1.1",
+    libraryDependencies += "net.java.dev.jna" % "jna" % "5.5.0",
     libraryDependencies ++= commonLibs ++ jvmLibs,
     assemblyJarName in assembly := "loctio-tray.jar",
     assemblyMergeStrategy in assembly := {

@@ -443,24 +443,7 @@ object Start extends SimpleSwingApplication {
     title = appName
     peer.setIconImages(iconImages("/user-online.ico"))
 
-    def userActive() = {
-      println("User active")
-    }
-    object watchMouse extends MouseAdapter {
-      override def mousePressed(e: MouseEvent) = userActive()
-      override def mouseReleased(e: MouseEvent) = userActive()
-      override def mouseWheelMoved(e: MouseWheelEvent) = userActive()
-      override def mouseMoved(e: MouseEvent) = userActive()
-    }
-    object watchKeyboard extends KeyAdapter {
-      override def keyPressed(e: KeyEvent) = userActive()
-      override def keyReleased(e: KeyEvent) = userActive()
-    }
-    peer.addMouseListener(watchMouse)
-    peer.addMouseMotionListener(watchMouse)
-    peer.addMouseWheelListener(watchMouse)
-    peer.addKeyListener(watchKeyboard)
-
+    UserActivity.start()
 
     var usersHtmlString = ""
     val users = new HtmlPanel(serverUrl)
@@ -518,8 +501,10 @@ object Start extends SimpleSwingApplication {
     def adjustCurrentUser(in: String): String = {
       val CurrentUserState = s"""(?s)(.*<tr data-user="$loginName">[^<]*<td>[^<]*<img[^>]*user-)([a-z]+)(.*)""".r
       in match {
-        case CurrentUserState(prefix, _, postfix) =>
-          prefix + cfg.state + postfix
+        case CurrentUserState(prefix, state, postfix) =>
+          // if other users see as as away, show it to us as well
+          val shownState = if (state !="away") cfg.state else state
+          prefix + shownState + postfix
         case _ =>
           in
       }
@@ -628,9 +613,15 @@ object Start extends SimpleSwingApplication {
 
   def requestUsers = {
     userApi.at(global).flatMap { api =>
-      println(s"Request users ${cfg.state}")
+      val activeState = if (cfg.state == "online" || cfg.state == "busy") {
+        if (UserActivity.secondsSinceLastActivity() < 5 * 60) cfg.state
+        else "away"
+      } else {
+        cfg.state
+      }
+      println(s"Request users $activeState")
       publicIpAddress.at(global).flatMap(addr =>
-        api.trayUsersHTML(addr, cfg.state)
+        api.trayUsersHTML(addr, activeState)
       )
     }
   }
