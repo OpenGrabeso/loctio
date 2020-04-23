@@ -5,6 +5,7 @@ import java.util.Properties
 import com.fasterxml.jackson.databind.JsonNode
 import com.google.api.client.http.{GenericUrl, HttpHeaders, HttpResponseException}
 import io.udash.rest.raw.HttpErrorException
+import shared.ChainingSyntax._
 
 object Main extends common.Formatting {
 
@@ -19,6 +20,7 @@ object Main extends common.Formatting {
       val lines = scala.io.Source.fromInputStream(secretStream).getLines
       val usersLine = lines.next()
       val users = usersLine.split(",").map(_.trim.toLowerCase)
+      secretStream.close()
       SecretResult(users.toSet, "")
     } catch {
       case _: NullPointerException => // no file found
@@ -32,6 +34,7 @@ object Main extends common.Formatting {
     Option(getClass.getResourceAsStream("/config.properties")).exists { is =>
       val prop = new Properties()
       prop.load(is)
+      is.close()
       prop.getProperty("devMode").toBoolean
     }
   }

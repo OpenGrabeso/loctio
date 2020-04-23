@@ -27,6 +27,7 @@ object FrontendScript extends DefineRequest("frontend/*") {
 
       val out = resp.raw.getOutputStream
       IOUtils.copy(res, out)
+      res.close()
       IOUtils.write("\n", out) // prevent empty file by always adding an empty line, empty file not handled well by Spark framework
     }
 

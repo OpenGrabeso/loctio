@@ -12,6 +12,7 @@ import com.github.opengrabeso.loctio.common.PublicIpAddress
 import com.github.opengrabeso.loctio.common.model.github.Notification
 import com.github.opengrabeso.loctio.rest.github.AuthorizedAPI
 import javax.swing.SwingUtilities
+import javax.imageio.ImageIO
 import rest.{RestAPI, RestAPIClient}
 
 import scala.concurrent.duration.Duration
@@ -251,6 +252,7 @@ object Start extends SimpleSwingApplication {
     }
     cfg = cfg.copy(state = state)
     Config.store(cfg)
+    Tray.setImage(s"/user-$state.ico")
 
   }
 
@@ -261,10 +263,30 @@ object Start extends SimpleSwingApplication {
     import javax.swing.UIManager
 
     private var state: String = ""
+    private var trayIcon: TrayIcon = _
+
+    private def loadIconImage(name: String) = {
+      val tray = SystemTray.getSystemTray
+      val iconSize = tray.getTrayIconSize
+      val is = getClass.getResourceAsStream(name)
+
+      try {
+        val image = ImageIO.read(is)
+        image.getScaledInstance(iconSize.width, iconSize.height, Image.SCALE_SMOOTH)
+      } finally {
+        is.close()
+      }
+    }
+
+    def setImage(name: String): Unit = {
+      assert(SwingUtilities.isEventDispatchThread)
+      val imageSized = loadIconImage(name)
+      trayIcon.setImage(imageSized)
+
+    }
 
     private def showImpl() = {
       assert(SwingUtilities.isEventDispatchThread)
-      import javax.imageio.ImageIO
       // https://docs.oracle.com/javase/7/docs/api/java/awt/SystemTray.html
 
       if (SystemTray.isSupported) {
@@ -276,12 +298,9 @@ object Start extends SimpleSwingApplication {
 
         val tray = SystemTray.getSystemTray
         val iconSize = tray.getTrayIconSize
-        val is = getClass.getResourceAsStream("/user-online.ico")
 
-        val image = ImageIO.read(is)
-
-        val imageSized = image.getScaledInstance(iconSize.width, iconSize.height, Image.SCALE_SMOOTH)
-        val trayIcon = new TrayIcon(imageSized, appName)
+        val imageSized = loadIconImage("/user-online.ico")
+        trayIcon = new TrayIcon(imageSized, appName)
 
         import java.awt.event.MouseAdapter
 

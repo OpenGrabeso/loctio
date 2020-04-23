@@ -17,6 +17,7 @@ class SimpleMenuItem (title: String, callback: => Unit) extends MenuItem(
 
     val is = getClass.getResourceAsStream(icon)
     val image = ImageIO.read(is)
+    is.close()
     val imageSized = image.getScaledInstance(iconSize.width, iconSize.height, Image.SCALE_SMOOTH)
     this.icon = new ImageIcon(imageSized)
   }
