@@ -136,23 +136,29 @@ object Start extends SimpleSwingApplication {
   }
   def performLogin(token: String): Unit = {
     usersReady = false
-    loginName = ""
-    server.at(global).flatMap(_.api.user(token).name).at(global).map(_._1).at(OnSwing).foreach { s =>
-      loginName = s
-      println(s"Login done $s")
-      // request users regularly
-      if (updateSchedule != null) updateSchedule.cancel()
-      updateSchedule = system.scheduler.schedule(Duration(0, duration.MINUTES), Duration(1, duration.MINUTES)){
-        requestUsers.at(OnSwing).foreach { case (users, tooltip) =>
-          if (token == cfg.token) { // ignore any pending futures with a different token
-            usersReady = true
-            mainFrame.setUsers(users, tooltip)
+    // if already logged in, report shutdown first so that we get complete notifications
+    val after = if (cfg.token.nonEmpty) {
+      sendShutdown()
+    } else Future.successful(())
+    after.at(OnSwing).foreach { _ =>
+      loginName = ""
+      server.at(global).flatMap(_.api.user(token).name).at(OnSwing).foreach { case (s, _) =>
+        loginName = s
+        println(s"Login done $s")
+        // request users regularly
+        if (updateSchedule != null) updateSchedule.cancel()
+        updateSchedule = system.scheduler.schedule(Duration(0, duration.MINUTES), Duration(1, duration.MINUTES)) {
+          requestUsers.at(OnSwing).foreach { case (users, tooltip) =>
+            if (token == cfg.token) { // ignore any pending futures with a different token
+              usersReady = true
+              mainFrame.setUsers(users, tooltip)
+            }
           }
-        }
-      }(global)
+        }(global)
 
-      mainFrame.clearNotifications()
-      requestNotifications(token)
+        mainFrame.clearNotifications()
+        requestNotifications(token)
+      }
     }
   }
 
@@ -256,8 +262,6 @@ object Start extends SimpleSwingApplication {
           contents += new SimpleMenuItem("Open web...", openWeb())
           contents += new Separator
           contents += new SimpleMenuItem("Login...", login())
-          contents += new SimpleMenuItem("Debug: Refresh (soft)", refresh(false))
-          contents += new SimpleMenuItem("Debug: Refresh (hard)", refresh(true))
           contents += new Separator
           contents += new SimpleMenuItem("Exit", appExit())
         }
