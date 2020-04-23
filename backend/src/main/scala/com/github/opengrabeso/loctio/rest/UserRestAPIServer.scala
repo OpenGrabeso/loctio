@@ -102,7 +102,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
     def userRowHTML(row: common.model.UserRow) = {
       //language=HTML
-      s"""<tr>
+      s"""<tr data-user="${row.login}">
            <td>${getUserStatusIcon(row.currentState)}</td>
            <td class="username"><a href="https://www.github.com/${row.login}">${row.login}</a></td>
            <td>${row.location}</td>

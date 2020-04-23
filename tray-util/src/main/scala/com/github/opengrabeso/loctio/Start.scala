@@ -276,6 +276,8 @@ object Start extends SimpleSwingApplication {
     val iconName = s"/user-$state.ico"
     Tray.setImage(iconName)
     mainFrame.peer.setIconImages(iconImages(iconName))
+    mainFrame.users.html = mainFrame.adjustCurrentUser(mainFrame.usersHtmlString)
+
   }
 
   private object Tray {
@@ -460,6 +462,7 @@ object Start extends SimpleSwingApplication {
     peer.addKeyListener(watchKeyboard)
 
 
+    var usersHtmlString = ""
     val users = new HtmlPanel(serverUrl)
 
     val notifications = new HtmlPanel(serverUrl) {
@@ -499,8 +502,9 @@ object Start extends SimpleSwingApplication {
     }
 
     private def replaceTime(in: String, displayFunc: ZonedDateTime => String): String = {
+      @scala.annotation.tailrec
       def recurse(s: String): String = {
-        val Time = "(?s)(.*)<time>([^<]+)<\\/time>(.*)".r
+        val Time = "(?s)(.*)<time>([^<]+)</time>(.*)".r
         s match {
           case Time(prefix, time, postfix) =>
             recurse(prefix + displayFunc(ZonedDateTime.parse(time)) + postfix)
@@ -511,8 +515,19 @@ object Start extends SimpleSwingApplication {
       recurse(in)
     }
 
+    def adjustCurrentUser(in: String): String = {
+      val CurrentUserState = s"""(?s)(.*<tr data-user="$loginName">[^<]*<td>[^<]*<img[^>]*user-)([a-z]+)(.*)""".r
+      in match {
+        case CurrentUserState(prefix, _, postfix) =>
+          prefix + cfg.state + postfix
+        case _ =>
+          in
+      }
+    }
+
     def setUsers(usHTML: String, statusText: String): this.type = {
-      users.html = replaceTime(usHTML, displayTime)
+      usersHtmlString = replaceTime(usHTML, displayTime)
+      users.html = adjustCurrentUser(usersHtmlString)
       reportTray(replaceTime(statusText, displayTime))
       this
     }
