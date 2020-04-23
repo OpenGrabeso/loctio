@@ -3,6 +3,7 @@ package rest
 
 import java.time.ZonedDateTime
 
+import common.model.CssData
 import io.udash.rest._
 
 import scala.concurrent.Future
@@ -16,6 +17,9 @@ trait RestAPI {
 
   @GET
   def now: Future[ZonedDateTime]
+
+  @GET("issues.css")
+  def issuesCss(): Future[CssData]
 }
 
 object RestAPI extends RestApiCompanion[EnhancedRestImplicits,RestAPI](EnhancedRestImplicits) {

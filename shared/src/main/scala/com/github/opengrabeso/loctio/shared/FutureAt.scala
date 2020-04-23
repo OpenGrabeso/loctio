@@ -1,6 +1,7 @@
 package com.github.opengrabeso.loctio.shared
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.Try
 
 object FutureAt {
@@ -17,9 +18,21 @@ object FutureAt {
     def recover[U >: T](pf: PartialFunction[Throwable, U]): Future[U] = future.recover(pf)(ec)
     def onComplete[U](f: Try[T] => U): Unit = future.onComplete(f)(ec)
     def transform[S](f: Try[T] => Try[S]): Future[S] = future.transform(f)(ec)
+    def await: T = Await.result(future, Duration.Inf)
   }
 
   implicit class FutureOps[T](future: Future[T]) {
     def at(ec: ExecutionContext) = new AtOps(future)(ec)
+    def awaitNow: T = at(executeNow).await
+  }
+
+  object executeNow extends ExecutionContext {
+    def execute(runnable: Runnable) = {
+      runnable.run()
+    }
+    def reportFailure(cause: Throwable) = {
+      cause.printStackTrace()
+    }
+
   }
 }

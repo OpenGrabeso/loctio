@@ -15,3 +15,13 @@ object HtmlData extends rest.EnhancedRestDataCompanion[HtmlData] {
   )
 
 }
+
+case class CssData(data: String)
+
+object CssData extends rest.EnhancedRestDataCompanion[CssData] {
+  implicit val rawReal: AsRawReal[RestResponse, CssData] = AsRawReal.create(
+    real => RestResponse(200, IMapping[PlainValue](), HttpBody.textual(real.data, mediaType = "text/css")),
+    raw => CssData(raw.body.readText())
+  )
+
+}

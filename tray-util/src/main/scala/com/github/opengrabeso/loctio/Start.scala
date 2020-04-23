@@ -4,13 +4,11 @@ import java.awt.Desktop
 import java.net.URL
 import java.time.{ZoneId, ZonedDateTime}
 import java.time.format._
-import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 import akka.actor.{ActorSystem, Cancellable}
 import com.github.opengrabeso.loctio.common.PublicIpAddress
 import com.github.opengrabeso.loctio.common.model.github.Notification
-import com.github.opengrabeso.loctio.common.model.{LocationInfo, UserRow}
 import com.github.opengrabeso.loctio.rest.github.AuthorizedAPI
 import javax.swing.SwingUtilities
 import rest.{RestAPI, RestAPIClient}
@@ -197,10 +195,23 @@ object Start extends SimpleSwingApplication {
     Desktop.getDesktop.browse(new URL(s"https://www.github.com/notifications?query=is%3Aunread").toURI)
   }
 
+  private def refresh(hard: Boolean): Unit = {
+    val after = if (hard) {
+      sendShutdown()
+    } else Future.successful(())
+    after.at(OnSwing).foreach { _ =>
+      requestNotifications(cfg.token)
+    }
+  }
+
+  private def sendShutdown(): Future[Unit] = {
+    userApi.at(global).flatMap(_.shutdown(rest.UserRestAPI.RestString("now")))
+  }
+
   private def appExit() = {
     println("appExit")
     icon.foreach(Tray.remove)
-    userApi.at(global).flatMap(_.shutdown(rest.UserRestAPI.RestString("now"))).at(OnSwing).foreach {_ =>
+    sendShutdown().at(OnSwing).foreach {_ =>
       System.exit(0)
     }
   }
@@ -254,6 +265,8 @@ object Start extends SimpleSwingApplication {
         addItem("Open web...", _ => openWeb())
         popup.addSeparator()
         addItem("Login...", login)
+        addItem("Debug: Refresh (soft)", _ => refresh(false))
+        addItem("Debug: Refresh (hard)", _ => refresh(true))
         popup.addSeparator()
         addItem("Exit", _ => appExit())
 

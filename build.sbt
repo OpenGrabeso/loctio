@@ -146,9 +146,6 @@ lazy val backend = (project in file("backend"))
     commonSettings,
 
     libraryDependencies ++= commonLibs ++ jvmLibs ++ Seq(
-      "com.google.http-client" % "google-http-client-appengine" % "1.31.0",
-      "com.google.http-client" % "google-http-client-jackson2" % "1.31.0",
-      "com.google.apis" % "google-api-services-storage" % "v1-rev158-1.25.0",
       "com.google.appengine.tools" % "appengine-gcs-client" % "0.8" exclude("javax.servlet", "servlet.api"),
       "com.google.cloud" % "google-cloud-storage" % "1.96.0",
 
@@ -159,11 +156,8 @@ lazy val backend = (project in file("backend"))
 
       //"org.webjars" % "webjars-locator-core" % "0.39",
 
-      "fr.opensagres.xdocreport.appengine-awt" % "appengine-awt" % "1.0.0",
-
       "com.sparkjava" % "spark-core" % "1.1.1" excludeAll ExclusionRule(organization = "org.eclipse.jetty"),
       "org.slf4j" % "slf4j-simple" % "1.6.1",
-      "commons-fileupload" % "commons-fileupload" % "1.3.2",
       "com.jsuereth" %% "scala-arm" % "2.0" exclude(
         "org.scala-lang.plugins", "scala-continuations-library_" + scalaBinaryVersion.value
       ),

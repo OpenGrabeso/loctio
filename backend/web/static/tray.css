@@ -34,10 +34,54 @@ th, td {
     color: olive;
 }
 
+.message.reason {
+    border: gray 1px solid;
+    border-radius: 2px;
+    padding: 0 2px;
+    background-color: lightsteelblue;
+}
+
+/* possible reasons:
+assign, author, comment, invitation, manual, mention, review_requested, security_alert, state_change, subscribed, team_mention
+*/
+
+.message.reason.assign {
+    background-color: lightcoral;
+}
+
+.message.reason.mention {
+    background-color: lightcoral;
+}
+
+.message.reason.author {
+    background-color: lightyellow;
+}
+
+.message.reason.comment {
+    background-color: lightyellow;
+}
+
+.message.reason.subscribed { /* the default reason (actually not a reason at all) */
+    display: none;
+}
+
+.notification.header {
+    background-color: #e6eaf5;
+}
+
+.notification.body {
+
+}
+
+.notification.signature {
+    background-color: #fffff5;
+}
+
 .icon {
     height: 16px;
     width: 16px
 }
+
 
 .username a:link {
     text-decoration: none;

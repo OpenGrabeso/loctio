@@ -3,7 +3,10 @@ package rest
 
 import Main._
 import java.time.ZonedDateTime
-import io.udash.rest.raw.HttpErrorException
+
+import com.github.opengrabeso.loctio.common.model.CssData
+import io.udash.css.CssStringRenderer
+import scalacss.internal.{Renderer, StringRenderer}
 
 object RestAPIServer extends RestAPI with RestAPIUtils {
 
@@ -37,4 +40,17 @@ object RestAPIServer extends RestAPI with RestAPIUtils {
   def now = syncResponse {
     ZonedDateTime.now()
   }
+
+
+  private lazy val issuesCssRendered: String = {
+    import common.css._
+    val styles = Seq(IssueStyles)
+    implicit val renderer: Renderer[String] = StringRenderer.defaultPretty
+    new CssStringRenderer(styles).render()
+  }
+
+  def issuesCss() = syncResponse {
+    CssData(issuesCssRendered)
+  }
+
 }
