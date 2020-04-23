@@ -208,32 +208,49 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           val addUnread = newUnread.diff(oldUnread)
 
           // download last comments for the new content
-          val newComments = addUnread.filter(_.subject.`type` == "Issue").flatMap { n =>
-            // the issue may have no comments
-            import rest.github.EnhancedRestImplicits._
+          val newComments = addUnread.flatMap {
+            case n if n.subject.`type` == "Issue" =>
+              // the issue may have no comments
+              import rest.github.EnhancedRestImplicits._
 
-            // if there is a comment, the only reason why we need to get the issue is to get its number (we need it for the link)
-            val issueResponse = Try(gitHubAPI.request[Issue](n.subject.url, userAuth.token)).toOption
-            val comment = Option(n.subject.latest_comment_url).filter(_.nonEmpty).flatMap(url => Try(gitHubAPI.request[Comment](url, userAuth.token)).toOption)
-            for (issue <- issueResponse) yield {
-              val prefix = s"https://www.github.com/${n.repository.full_name}/issues/${issue.number}"
-              // if there is a last comment, obtain it, when not, use the issue
-              val (linkUrl, by, time, body) = comment.map { c =>
-                println(s"Get comment ${c.id}")
-                (prefix + "#issuecomment-" + c.id.toString, c.user.login, c.updated_at, c.body)
-              }.getOrElse {
-                // this does not seem to happen normally - it seems the issue is also accessible as a comment
-                println(s"Get issue ${issue.number}")
-                (prefix, issue.user.login, issue.updated_at, issue.body)
+              // if there is a comment, the only reason why we need to get the issue is to get its number (we need it for the link)
+              val issueResponse = Try(gitHubAPI.request[Issue](n.subject.url, userAuth.token)).toOption
+              val comment = Option(n.subject.latest_comment_url).filter(_.nonEmpty).flatMap(url => Try(gitHubAPI.request[Comment](url, userAuth.token)).toOption)
+              for (issue <- issueResponse) yield {
+                val prefix = s"https://www.github.com/${n.repository.full_name}/issues/${issue.number}"
+                // if there is a last comment, obtain it, when not, use the issue
+                val (linkUrl, by, time, body) = comment.map { c =>
+                  println(s"Get comment ${c.id}")
+                  (prefix + "#issuecomment-" + c.id.toString, c.user.login, c.updated_at, c.body)
+                }.getOrElse {
+                  // this does not seem to happen normally - it seems the issue is also accessible as a comment
+                  println(s"Get issue ${issue.number}")
+                  (prefix, issue.user.login, issue.updated_at, issue.body)
+                }
+
+                val markdown = gitHubAPI.api.authorized("Bearer " + userAuth.token).markdown.markdown(body).awaitNow
+                n.subject.url -> CommentContent(
+                  linkUrl,
+                  s"#${issue.number}",
+                  HTMLUtils.xhtml(markdown.data), by, time
+                )
               }
-
-              val markdown = gitHubAPI.api.authorized("Bearer " + userAuth.token).markdown.markdown(body).awaitNow
-              n.subject.url -> CommentContent(
-                linkUrl,
-                s"#${issue.number}",
-                HTMLUtils.xhtml(markdown.data), by, time
-              )
-            }
+            case n if n.subject.`type` == "Release" =>
+              import rest.github.EnhancedRestImplicits._
+              val releaseResponse = Try(gitHubAPI.request[Release](n.subject.url, userAuth.token)).toOption
+              for (release <- releaseResponse) yield {
+                n.subject.url -> CommentContent(
+                  release.html_url,
+                  s"${release.tag_name}",
+                  release.body,
+                  release.author.login,
+                  release.published_at
+                )
+              }
+            case n if n.subject.`type` == "CheckSuite" =>
+              None
+            case _ =>
+              None
           }
 
           // remove any message reported as read (I do not think this ever happens, but if it would, we would handle it)
