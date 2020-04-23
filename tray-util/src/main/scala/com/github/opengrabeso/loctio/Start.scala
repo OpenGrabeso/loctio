@@ -1,6 +1,6 @@
 package com.github.opengrabeso.loctio
 
-import java.awt.Desktop
+import java.awt.{AWTException, Desktop}
 import java.awt.event.{KeyAdapter, KeyEvent, MouseAdapter, MouseEvent, MouseWheelEvent}
 import java.net.URL
 import java.time.{ZoneId, ZonedDateTime}
@@ -103,10 +103,10 @@ object Start extends SimpleSwingApplication {
 
   def githubApi(token: String): AuthorizedAPI = rest.github.GitHubAPIClient.api.authorized("Bearer " + cfg.token)
 
-  def login(location: Point) = {
+  def login() = {
     assert(SwingUtilities.isEventDispatchThread)
     val frame = loginFrame
-    placeFrameAbove(frame, location)
+    placeFrameAbove(frame, mouseLocation)
     frame.init()
     frame.open()
   }
@@ -156,6 +156,8 @@ object Start extends SimpleSwingApplication {
     }
   }
 
+  def mouseLocation: Point = java.awt.MouseInfo.getPointerInfo.getLocation
+
   // make sure frame is on screen
   def placeFrame(frame: Frame, location: Point) = {
     val config = frame.peer.getGraphicsConfiguration
@@ -175,14 +177,14 @@ object Start extends SimpleSwingApplication {
     placeFrame(frame, new Point(location.x, location.y - frame.size.height - 150))
   }
 
-  private def openWindow(location: Point): Unit = {
+  private def openWindow(): Unit = {
     // place the window a bit above the mouse - this avoid conflicting with the menu
     if (usersReady) {
 
       if (mainFrame.size == new Dimension(0,0)) mainFrame.pack()
 
       if (!mainFrame.visible) {
-        placeFrameAbove(mainFrame, location)
+        placeFrameAbove(mainFrame, mouseLocation)
       }
       mainFrame.open() // open or make focused / on top (if already open)
     }
@@ -218,10 +220,10 @@ object Start extends SimpleSwingApplication {
   }
 
   private object Tray {
-    import java.awt._
+    import java.awt.{TrayIcon, SystemTray, Image}
     import java.awt.event._
 
-    import javax.swing._
+    import javax.swing.UIManager
 
     private var state: String = ""
 
@@ -248,39 +250,30 @@ object Start extends SimpleSwingApplication {
 
         import java.awt.event.MouseAdapter
 
-        val popup = new JPopupMenu
-
-        def addItem(title: String, action: Point => Unit): JMenuItem = {
-          val item = new JMenuItem(title)
-          object listener extends ActionListener {
-            def actionPerformed(e: ActionEvent) = {
-              action(java.awt.MouseInfo.getPointerInfo.getLocation)
-            }
-          }
-          item.addActionListener(listener)
-          popup.add(item)
-          item
+        val openItem = new SimpleMenuItem("Open...", openWindow())
+        val popup = new PopupMenu {
+          contents += openItem
+          contents += new SimpleMenuItem("Open web...", openWeb())
+          contents += new Separator
+          contents += new SimpleMenuItem("Login...", login())
+          contents += new SimpleMenuItem("Debug: Refresh (soft)", refresh(false))
+          contents += new SimpleMenuItem("Debug: Refresh (hard)", refresh(true))
+          contents += new Separator
+          contents += new SimpleMenuItem("Exit", appExit())
         }
 
-        val openItem = addItem("Open...", openWindow)
-        addItem("Open web...", _ => openWeb())
-        popup.addSeparator()
-        addItem("Login...", login)
-        addItem("Debug: Refresh (soft)", _ => refresh(false))
-        addItem("Debug: Refresh (hard)", _ => refresh(true))
-        popup.addSeparator()
-        addItem("Exit", _ => appExit())
 
         def showPopup(e: MouseEvent) = {
-          openItem.setEnabled(usersReady)
-          popup.setLocation(e.getX, e.getY)
-          popup.setInvoker(popup)
-          popup.setVisible(true)
+          openItem.enabled = usersReady
+          val p = popup.peer
+          p.setLocation(e.getX, e.getY)
+          p.setInvoker(p)
+          p.setVisible(true)
         }
 
         trayIcon addMouseListener new MouseAdapter {
 
-          override def mouseClicked(e: MouseEvent) = if (e.getButton == 1) openWindow(new Point(e.getPoint))
+          override def mouseClicked(e: MouseEvent) = if (e.getButton == 1) openWindow()
 
           override def mouseReleased(e: MouseEvent) = maybeShowPopup(e)
 
@@ -295,7 +288,7 @@ object Start extends SimpleSwingApplication {
 
         // note: this does not work on Java 8 (see https://bugs.openjdk.java.net/browse/JDK-8146537)
         trayIcon.addActionListener { e =>
-          openWindow(java.awt.MouseInfo.getPointerInfo.getLocation)
+          openWindow()
         }
 
 
@@ -398,7 +391,7 @@ object Start extends SimpleSwingApplication {
       listenTo(mouse.clicks)
       reactions += {
         case e: MouseClicked if e.peer.getButton == 1 =>
-          openWindow(java.awt.MouseInfo.getPointerInfo.getLocation)
+          openWindow()
       }
     }
 
