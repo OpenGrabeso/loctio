@@ -19,9 +19,6 @@ object UserState {
         } else {
           "offline"
         }
-      case "offline" if (age < 1) =>
-        // if user is reported as offline recently, report as online, because another client may still report as online
-        state
       case _ =>
         // if user is reported as offline, do not check if the user was active recently
         // as we got a positive notification about going offline
@@ -71,7 +68,7 @@ object UserState {
     }
   }
 
-  def userTable(currentUser: String, currentUserInvisible: Boolean, value: Seq[(String, LocationInfo)]) = {
+  def userTable(currentUser: String, currentUserState: String, value: Seq[(String, LocationInfo)]) = {
     def userLowerThan(a: UserRow, b: UserRow): Boolean = {
       def userGroup(a: UserRow) = {
         if (a.login == currentUser) 0 // current user first
@@ -88,7 +85,6 @@ object UserState {
     //println(s"Users:\n${value.mkString("\n")}")
     value.map { u =>
       if (u._1 == currentUser) {
-        val currentUserState = if (currentUserInvisible) "invisible" else u._2.state
         UserRow(u._1, u._2.location, u._2.lastSeen, currentUserState)
       } else {
         UserRow(u._1, u._2.location, u._2.lastSeen, getEffectiveUserStatus(u._2.state, u._2.lastSeen))

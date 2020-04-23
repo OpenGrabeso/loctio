@@ -77,13 +77,14 @@ class PageView(
     // change of login will force the table to be created again
     // transformToSeq binding is currently not needed, as change of invisibility will re-create the table
     // but it is nicer that way (and the re-creation might no longer happen in future)
-    val items = model.subModel(_.settings).subProp(_.invisible).transformToSeq { invisible =>
+    val items = model.subModel(_.settings).subProp(_.state).transformToSeq { state =>
       val current = ar.login == model.subModel(_.settings).subProp(_.login).get
       val base = Seq(
         UdashDropdown.DefaultDropdownItem.Button("Name location", callback),
       )
-      if (current) base ++ Seq(
-        UdashDropdown.DefaultDropdownItem.Button(if (invisible) "Make visible" else "Make invisible", () => presenter.toggleInvisible()),
+      val states = Seq("invisible", "online", "busy")
+      if (current) base ++ states.filter(_ != state).map(s =>
+        UdashDropdown.DefaultDropdownItem.Button(s"Make $s", () => presenter.changeUserState(s)),
       ) else base
     }
 
@@ -101,7 +102,7 @@ class PageView(
       TableFactory.TableAttrib("Location", (ar, _, _) => ar.location.render),
       TableFactory.TableAttrib(
         "Last seen",
-        (ar, _, _) => if (ar.currentState != "online") common.UserState.smartTime(ar.lastTime, formatTime, formatDate, formatDayOfWeek).render else ""
+        (ar, _, _) => if (ar.currentState != "online" && ar.currentState != "busy") common.UserState.smartTime(ar.lastTime, formatTime, formatDate, formatDayOfWeek).render else ""
       ),
       TableFactory.TableAttrib("", (ar, _, _) => userDropDown(ar)),
     )

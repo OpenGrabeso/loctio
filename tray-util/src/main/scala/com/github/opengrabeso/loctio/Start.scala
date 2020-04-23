@@ -1,6 +1,7 @@
 package com.github.opengrabeso.loctio
 
-import java.awt.Desktop
+import java.awt.{AWTException, Desktop}
+import java.awt.event.{KeyAdapter, KeyEvent, MouseAdapter, MouseEvent, MouseWheelEvent}
 import java.net.URL
 import java.time.{ZoneId, ZonedDateTime}
 import java.time.format._
@@ -11,6 +12,8 @@ import com.github.opengrabeso.loctio.common.PublicIpAddress
 import com.github.opengrabeso.loctio.common.model.github.Notification
 import com.github.opengrabeso.loctio.rest.github.AuthorizedAPI
 import javax.swing.SwingUtilities
+import javax.imageio.ImageIO
+import java.awt.{TrayIcon, SystemTray, Image}
 import rest.{RestAPI, RestAPIClient}
 
 import scala.concurrent.duration.Duration
@@ -31,7 +34,7 @@ object Start extends SimpleSwingApplication {
 
   val exitEvent = Promise[Boolean]()
 
-  private var cfg = Config.load
+  private var cfg = Config.empty
   private var loginName = ""
   private var usersReady = false
   private var updateSchedule: Cancellable = _
@@ -102,19 +105,29 @@ object Start extends SimpleSwingApplication {
 
   def githubApi(token: String): AuthorizedAPI = rest.github.GitHubAPIClient.api.authorized("Bearer " + cfg.token)
 
-  def login(location: Point) = {
+  def login() = {
     assert(SwingUtilities.isEventDispatchThread)
     val frame = loginFrame
-    placeFrameAbove(frame, location)
+    placeFrameAbove(frame, mouseLocation)
     frame.init()
     frame.open()
   }
 
-  def requestNotifications(token: String): Unit = {
+  private def cancelNotifications(): Unit = {
     if (notificationsSchedule != null) {
       notificationsSchedule.cancel()
       notificationsSchedule = null
     }
+  }
+  private def cancelUserUpdates(): Unit = {
+    if (updateSchedule != null) {
+      updateSchedule.cancel()
+      updateSchedule = null
+    }
+  }
+
+  def requestNotifications(token: String): Unit = {
+    cancelNotifications()
 
     def requestNextAfter(seconds: Int) = {
       notificationsSchedule = system.scheduler.scheduleOnce(Duration(seconds, duration.SECONDS)){
@@ -133,27 +146,39 @@ object Start extends SimpleSwingApplication {
     }
 
   }
-  def performLogin(token: String): Unit = {
-    usersReady = false
-    loginName = ""
-    server.at(global).flatMap(_.api.user(token).name).at(global).map(_._1).at(OnSwing).foreach { s =>
-      loginName = s
-      println(s"Login done $s")
-      // request users regularly
-      if (updateSchedule != null) updateSchedule.cancel()
-      updateSchedule = system.scheduler.schedule(Duration(0, duration.MINUTES), Duration(1, duration.MINUTES)){
-        requestUsers.at(OnSwing).foreach { case (users, tooltip) =>
-          if (token == cfg.token) { // ignore any pending futures with a different token
-            usersReady = true
-            mainFrame.setUsers(users, tooltip)
-          }
-        }
-      }(global)
 
-      mainFrame.clearNotifications()
-      requestNotifications(token)
+  def performLogout(): Future[Unit] = {
+    cancelNotifications()
+    cancelUserUpdates()
+    sendShutdown()
+  }
+
+  def performLogin(token: String): Future[Unit] = {
+    usersReady = false
+    // if already logged in, report shutdown first so that we get complete notifications
+    loginName = ""
+    if (token != "") { // login with token == "" means log-out
+      server.at(global).flatMap(_.api.user(token).name).at(OnSwing).map { case (s, _) =>
+        loginName = s
+        println(s"Login done $s")
+        // request users regularly
+        updateSchedule = system.scheduler.schedule(Duration(0, duration.MINUTES), Duration(1, duration.MINUTES)) {
+          requestUsers.at(OnSwing).foreach { case (users, tooltip) =>
+            if (token == cfg.token) { // ignore any pending futures with a different token
+              usersReady = true
+              mainFrame.setUsers(users, tooltip)
+            }
+          }
+        }(global)
+
+        requestNotifications(token)
+      }
+    } else {
+      Future.successful(())
     }
   }
+
+  def mouseLocation: Point = java.awt.MouseInfo.getPointerInfo.getLocation
 
   // make sure frame is on screen
   def placeFrame(frame: Frame, location: Point) = {
@@ -174,14 +199,14 @@ object Start extends SimpleSwingApplication {
     placeFrame(frame, new Point(location.x, location.y - frame.size.height - 150))
   }
 
-  private def openWindow(location: Point): Unit = {
+  private def openWindow(): Unit = {
     // place the window a bit above the mouse - this avoid conflicting with the menu
     if (usersReady) {
 
       if (mainFrame.size == new Dimension(0,0)) mainFrame.pack()
 
       if (!mainFrame.visible) {
-        placeFrameAbove(mainFrame, location)
+        placeFrameAbove(mainFrame, mouseLocation)
       }
       mainFrame.open() // open or make focused / on top (if already open)
     }
@@ -205,6 +230,7 @@ object Start extends SimpleSwingApplication {
   }
 
   private def sendShutdown(): Future[Unit] = {
+    println("Send shutdown")
     userApi.at(global).flatMap(_.shutdown(rest.UserRestAPI.RestString("now")))
   }
 
@@ -216,17 +242,76 @@ object Start extends SimpleSwingApplication {
     }
   }
 
+  def loadScaledImages(name: String, dimension: Seq[Dimension]): Seq[Image] = {
+    val is = getClass.getResourceAsStream(name)
+    try {
+      val image = ImageIO.read(is)
+      for (d <- dimension) yield {
+        image.getScaledInstance(d.width, d.height, Image.SCALE_SMOOTH)
+      }
+    } finally {
+      is.close()
+    }
+  }
+
+  def iconImages(iconName: String) = {
+    val images = loadScaledImages(iconName, Seq(16, 24, 32, 48, 64).map(s => new Dimension(s, s)))
+    import collection.JavaConverters._
+    images.asJava
+
+  }
+  private def userState(state: String): Unit = {
+    assert(SwingUtilities.isEventDispatchThread)
+    println(s"state $state")
+    (state, cfg.state) match {
+      case ("offline", x) if x != "offline" =>
+        performLogout()
+      case (x, "offline") if x != "offline" =>
+        performLogin(cfg.token)
+      case _ =>
+    }
+    cfg = cfg.copy(state = state)
+    Config.store(cfg)
+
+    val iconName = s"/user-$state.ico"
+    Tray.setImage(iconName)
+    mainFrame.peer.setIconImages(iconImages(iconName))
+  }
+
   private object Tray {
-    import java.awt._
     import java.awt.event._
 
-    import javax.swing._
+    import javax.swing.UIManager
 
     private var state: String = ""
+    private var trayIcon: TrayIcon = _
+
+    // for some strange reason calling the function did not work when placed outside of the Tray (silently stuck)
+    def loadScaledImage(name: String, dimension: Dimension) = {
+      val is = getClass.getResourceAsStream(name)
+      try {
+        val image = ImageIO.read(is)
+        image.getScaledInstance(dimension.width, dimension.height, Image.SCALE_SMOOTH)
+      } finally {
+        is.close()
+      }
+    }
+
+    private def loadTrayIconImage(name: String) = {
+      val tray = SystemTray.getSystemTray
+      val iconSize = tray.getTrayIconSize
+      println(s"loadTrayIconImage $name")
+      loadScaledImage(name, iconSize)
+    }
+
+    def setImage(name: String): Unit = {
+      assert(SwingUtilities.isEventDispatchThread)
+      val imageSized = loadTrayIconImage(name)
+      trayIcon.setImage(imageSized)
+    }
 
     private def showImpl() = {
       assert(SwingUtilities.isEventDispatchThread)
-      import javax.imageio.ImageIO
       // https://docs.oracle.com/javase/7/docs/api/java/awt/SystemTray.html
 
       if (SystemTray.isSupported) {
@@ -238,48 +323,41 @@ object Start extends SimpleSwingApplication {
 
         val tray = SystemTray.getSystemTray
         val iconSize = tray.getTrayIconSize
-        val is = getClass.getResourceAsStream("/user-online.ico")
 
-        val image = ImageIO.read(is)
-
-        val imageSized = image.getScaledInstance(iconSize.width, iconSize.height, Image.SCALE_SMOOTH)
-        val trayIcon = new TrayIcon(imageSized, appName)
+        val imageSized = loadTrayIconImage("/user-online.ico")
+        trayIcon = new TrayIcon(imageSized, appName)
 
         import java.awt.event.MouseAdapter
 
-        val popup = new JPopupMenu
-
-        def addItem(title: String, action: Point => Unit): JMenuItem = {
-          val item = new JMenuItem(title)
-          object listener extends ActionListener {
-            def actionPerformed(e: ActionEvent) = {
-              action(java.awt.MouseInfo.getPointerInfo.getLocation)
-            }
+        val openItem = new SimpleMenuItem("Open...", openWindow())
+        val popup = new PopupMenu {
+          contents += new Menu("State") {
+            contents += new SimpleMenuItem("Online", userState("online"), "/user-online.ico", iconSize)
+            contents += new SimpleMenuItem("Invisible", userState("invisible"), "/user-invisible.ico", iconSize)
+            contents += new SimpleMenuItem("Busy", userState("busy"), "/user-busy.ico", iconSize)
+            contents += new SimpleMenuItem("Offline", userState("offline"), "/user-offline.ico", iconSize)
           }
-          item.addActionListener(listener)
-          popup.add(item)
-          item
+          contents += new Separator
+          contents += openItem
+          contents += new SimpleMenuItem("Open web...", openWeb())
+          contents += new Separator
+          contents += new SimpleMenuItem("Login...", login())
+          contents += new Separator
+          contents += new SimpleMenuItem("Exit", appExit())
         }
 
-        val openItem = addItem("Open...", openWindow)
-        addItem("Open web...", _ => openWeb())
-        popup.addSeparator()
-        addItem("Login...", login)
-        addItem("Debug: Refresh (soft)", _ => refresh(false))
-        addItem("Debug: Refresh (hard)", _ => refresh(true))
-        popup.addSeparator()
-        addItem("Exit", _ => appExit())
 
         def showPopup(e: MouseEvent) = {
-          openItem.setEnabled(usersReady)
-          popup.setLocation(e.getX, e.getY)
-          popup.setInvoker(popup)
-          popup.setVisible(true)
+          openItem.enabled = usersReady
+          val p = popup.peer
+          p.setLocation(e.getX, e.getY)
+          p.setInvoker(p)
+          p.setVisible(true)
         }
 
         trayIcon addMouseListener new MouseAdapter {
 
-          override def mouseClicked(e: MouseEvent) = if (e.getButton == 1) openWindow(new Point(e.getPoint))
+          override def mouseClicked(e: MouseEvent) = if (e.getButton == 1) openWindow()
 
           override def mouseReleased(e: MouseEvent) = maybeShowPopup(e)
 
@@ -294,7 +372,7 @@ object Start extends SimpleSwingApplication {
 
         // note: this does not work on Java 8 (see https://bugs.openjdk.java.net/browse/JDK-8146537)
         trayIcon.addActionListener { e =>
-          openWindow(java.awt.MouseInfo.getPointerInfo.getLocation)
+          openWindow()
         }
 
 
@@ -309,21 +387,6 @@ object Start extends SimpleSwingApplication {
       } else {
         None
       }
-    }
-
-    private def removeImpl(icon: TrayIcon): Unit = {
-      assert(SwingUtilities.isEventDispatchThread)
-      if (SystemTray.isSupported) {
-        val tray = SystemTray.getSystemTray
-        tray.remove(icon)
-      }
-    }
-
-    private def changeStateImpl(icon: TrayIcon, s: String): Unit = {
-      assert(SwingUtilities.isEventDispatchThread)
-      state = s
-      val text = if (state.isEmpty) appName else state
-      icon.setToolTip(text)
     }
 
     def swingInvokeAndWait[T](callback: => T): T = {
@@ -341,20 +404,27 @@ object Start extends SimpleSwingApplication {
 
     def remove(icon: TrayIcon): Unit = {
       // wait to be sure the thread removing the icon is not terminated by exit before the removal is completed
-      swingInvokeAndWait(removeImpl(icon))
+      assert(SwingUtilities.isEventDispatchThread)
+      if (SystemTray.isSupported) {
+        val tray = SystemTray.getSystemTray
+        tray.remove(icon)
+      }
     }
 
     def message(message: String): Unit = {
       assert(SwingUtilities.isEventDispatchThread)
-      icon.foreach { i =>
-        i.displayMessage(appName, message, TrayIcon.MessageType.NONE)
+      if (SystemTray.isSupported) {
+        icon.foreach { i =>
+          i.displayMessage(appName, message, TrayIcon.MessageType.NONE)
+        }
       }
     }
 
     def changeState(icon: TrayIcon, s: String): Unit = {
-      OnSwing.future {
-        changeStateImpl(icon, s)
-      }
+      assert(SwingUtilities.isEventDispatchThread)
+      state = s
+      val text = if (state.isEmpty) appName else state
+      icon.setToolTip(text)
     }
   }
 
@@ -362,7 +432,6 @@ object Start extends SimpleSwingApplication {
 
   def reportTray(message: String): Unit = {
     assert(SwingUtilities.isEventDispatchThread)
-
     icon.foreach(Tray.changeState(_, message))
   }
 
@@ -370,6 +439,26 @@ object Start extends SimpleSwingApplication {
     assert(SwingUtilities.isEventDispatchThread)
 
     title = appName
+    peer.setIconImages(iconImages("/user-online.ico"))
+
+    def userActive() = {
+      println("User active")
+    }
+    object watchMouse extends MouseAdapter {
+      override def mousePressed(e: MouseEvent) = userActive()
+      override def mouseReleased(e: MouseEvent) = userActive()
+      override def mouseWheelMoved(e: MouseWheelEvent) = userActive()
+      override def mouseMoved(e: MouseEvent) = userActive()
+    }
+    object watchKeyboard extends KeyAdapter {
+      override def keyPressed(e: KeyEvent) = userActive()
+      override def keyReleased(e: KeyEvent) = userActive()
+    }
+    peer.addMouseListener(watchMouse)
+    peer.addMouseMotionListener(watchMouse)
+    peer.addMouseWheelListener(watchMouse)
+    peer.addKeyListener(watchKeyboard)
+
 
     val users = new HtmlPanel(serverUrl)
 
@@ -378,7 +467,7 @@ object Start extends SimpleSwingApplication {
       listenTo(mouse.clicks)
       reactions += {
         case e: MouseClicked if e.peer.getButton == 1 =>
-          openWindow(java.awt.MouseInfo.getPointerInfo.getLocation)
+          openWindow()
       }
     }
 
@@ -485,15 +574,18 @@ object Start extends SimpleSwingApplication {
         contents += new Button("OK") {
           reactions += {
             case event.ButtonClicked(_) =>
-              if (tokenField.text.nonEmpty) {
-                cfg = cfg.copy(token = tokenField.text)
-                Config.store(cfg)
+              val after = if (cfg.token.nonEmpty) {
+                performLogout()
+              } else Future.successful(())
+              after.at(OnSwing).foreach { _ =>
+                if (tokenField.text.nonEmpty) {
+                  cfg = cfg.copy(token = tokenField.text)
+                  Config.store(cfg)
+                }
+                // even when the user did not change the token, we perform a login to refresh
                 performLogin(cfg.token)
-              } else {
-                // refresh
-                performLogin(cfg.token)
+                dialog.close()
               }
-              dialog.close()
           }
         }
         contents += new Button("Cancel") {
@@ -511,21 +603,21 @@ object Start extends SimpleSwingApplication {
     //t.open()
   }
 
-  if (cfg.token.nonEmpty) {
-    OnSwing.future {
-      performLogin(cfg.token)
-    }
+  OnSwing.future {
+    cfg = Config.load
+    performLogin(cfg.token)
   }
 
   private val publicIpAddress = PublicIpAddress.get(global)
 
 
   def requestUsers = {
-    userApi.at(global).flatMap(api =>
+    userApi.at(global).flatMap { api =>
+      println(s"Request users ${cfg.state}")
       publicIpAddress.at(global).flatMap(addr =>
-        api.trayUsersHTML(addr, "online")
+        api.trayUsersHTML(addr, cfg.state)
       )
-    )
+    }
   }
 
 }

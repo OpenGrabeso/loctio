@@ -127,7 +127,7 @@ class PagePresenter(
       val currentUser = currentLogin
       res match {
         case Success(value) =>
-          model.subProp(_.users).set(UserState.userTable(currentUser, properties.subProp(_.invisible).get, value))
+          model.subProp(_.users).set(UserState.userTable(currentUser, properties.subProp(_.state).get, value))
           model.subProp(_.loading).set(false)
         case Failure(exception) =>
           model.subProp(_.error).set(Some(exception))
@@ -137,7 +137,7 @@ class PagePresenter(
   }
 
   def refreshUsers(token: String, ipAddress: String): Unit = {
-    val invisible = properties.subProp(_.invisible).get
+    val invisible = properties.subProp(_.state).get == "invisible"
     val sinceLastActiveMin = (System.currentTimeMillis() - lastActive) / 60000
 
     val state = if (invisible) "invisible" else if (sinceLastActiveMin < 5) "online" else "away"
@@ -154,8 +154,8 @@ class PagePresenter(
     userAPI.setLocationName(login, location).onComplete(loadUsersCallback(token, _))
   }
 
-  def toggleInvisible(): Unit = {
-    properties.subProp(_.invisible).set(!properties.subProp(_.invisible).get)
+  def changeUserState(s: String): Unit = {
+    properties.subProp(_.state).set(s)
     SettingsModel.store(properties.get)
     refreshUsers()
   }
