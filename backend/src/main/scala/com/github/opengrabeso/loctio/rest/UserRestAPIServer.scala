@@ -2,6 +2,7 @@ package com.github.opengrabeso.loctio
 package rest
 
 import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
 import com.softwaremill.sttp.HttpURLConnectionBackend
@@ -204,8 +205,13 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           val (newUnread, read) = response.data.partition(_.unread)
 
           val oldUnread = recentSession.filter(_.lastModified.nonEmpty).map(_.currentMesages).getOrElse(Seq.empty)
+          val oldUnreadIds = oldUnread.map(_.id).toSet // cannot compare Notification object, does not have a value based equals
+          val readIds = read.map(_.id).toSet
+
           // add messages reported as unread, but only when they are not present yet, insert recent messages first
-          val addUnread = newUnread.diff(oldUnread)
+          val addUnread = newUnread.filterNot(n => oldUnreadIds.contains(n.id))
+          // remove any message reported as read (I do not think this ever happens, but if it would, we would handle it)
+          val unread = addUnread ++ oldUnread.filterNot(n => readIds.contains(n.id))
 
           // download last comments for the new content
           val newComments = addUnread.flatMap {
@@ -215,26 +221,20 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
               // if there is a comment, the only reason why we need to get the issue is to get its number (we need it for the link)
               val issueResponse = Try(gitHubAPI.request[Issue](n.subject.url, userAuth.token).awaitNow).toOption
-              // TODO: display only most recent (some time gate?)
+              //val since = response.headers.lastModified.map(ZonedDateTime.parse(_, DateTimeFormatter.RFC_1123_DATE_TIME))
               for (issue <- issueResponse) yield {
                 // do not try getting comments when the latest_comment_url says there are none
                 val comments = if (n.subject.latest_comment_url != n.subject.url) Try {
-                  val numberOfLast = 5
-                  val firstComments = gitHubAPI.api.authorized("Bearer " + userAuth.token)
+                  val commentsSince = gitHubAPI.api.authorized("Bearer " + userAuth.token)
                       .repos(n.repository.owner.login, n.repository.name)
                       .issuesAPI(issue.number)
-                      .comments(per_page = numberOfLast).awaitNow
+                      .comments(since = n.last_read_at).awaitNow
 
-                  val lastPageHeader = firstComments.headers.paging.get("last")
-                  lastPageHeader.map { lastPageUrl =>
-                    val lastPageComments = gitHubAPI.requestWithHeaders[Comment](lastPageUrl, userAuth.token).awaitNow
-                    if (lastPageComments.data.size < numberOfLast) {
-                      // if there are too few last page comments, get the page before as well
-                      lastPageComments.headers.paging.get("prev").toSeq.flatMap { url =>
-                        gitHubAPI.requestWithHeaders[Comment](url, userAuth.token).awaitNow.data
-                      } ++ lastPageComments.data.takeRight(numberOfLast)
-                    } else lastPageComments.data
-                  }.getOrElse(firstComments.data)
+                  // if nothing is obtained this way, use the latest_comment_url
+                  if (commentsSince.data.isEmpty) {
+                    Seq(gitHubAPI.request[Comment](n.subject.latest_comment_url, userAuth.token).awaitNow)
+                  } else commentsSince.data
+
                 }.toOption.toSeq.flatten else Seq.empty
 
                 val prefix = s"https://www.github.com/${n.repository.full_name}/issues/${issue.number}"
@@ -271,8 +271,6 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               None
           }
 
-          // remove any message reported as read (I do not think this ever happens, but if it would, we would handle it)
-          val unread = addUnread ++ oldUnread.diff(read)
           val comments = recentSession.map(_.lastComments).getOrElse(Map.empty) ++ newComments
 
           println(s"${userAuth.login}: since $ifModifiedSince new: ${newUnread.size}, read: ${read.size}, unread: ${unread.size}")
