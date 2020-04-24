@@ -16,6 +16,7 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 import shared.FutureAt._
 import shared.ChainingSyntax._
+import common.Util._
 
 object UserRestAPIServer {
   case class CommentContent(
@@ -31,7 +32,7 @@ object UserRestAPIServer {
     lastModified: Option[String], // lastModified HTTP headers used for notifications optimization
     lastPoll: ZonedDateTime, // last time when the user has polled notifications
     currentMesages: Seq[Notification],
-    lastComments: Map[String, CommentContent], // we use URL for identification, as this is sure to be stable for an issue
+    lastComments: Map[String, Seq[CommentContent]], // we use URL for identification, as this is sure to be stable for an issue
     mostRecentNotified: Option[ZonedDateTime] // most recent notification display to the user
   )
 
@@ -204,48 +205,84 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           val (newUnread, read) = response.data.partition(_.unread)
 
           val oldUnread = recentSession.filter(_.lastModified.nonEmpty).map(_.currentMesages).getOrElse(Seq.empty)
-          // add messages reported as unread, but only when they are not present yet, insert recent messages first
-          val addUnread = newUnread.diff(oldUnread)
+          // cannot compare Notification object, does not have a value based equals
+          val newUnreadIds = newUnread.map(_.subject.url).toSet
+          val readIds = read.map(_.subject.url).toSet
 
+          // when a notification with the same id is issues again, it means the topic was updated
+          // and we need to re-download the content
+          val keepUnread = oldUnread.filterNot(n => newUnreadIds.contains(n.subject.url) || readIds.contains(n.subject.url))
+          // remove any message reported as read (I do not think this ever happens, but if it would, we would handle it)
+          val unread = newUnread ++ keepUnread
+          val unreadIds = unread.map(_.subject.url).toSet
+
+          println(s"${userAuth.login}: since $ifModifiedSince new: ${newUnread.size}, read: ${read.size}, unread: ${unread.size}")
           // download last comments for the new content
-          val newComments = addUnread.flatMap {
+          val newComments = newUnread.flatMap {
             case n if n.subject.`type` == "Issue" =>
               // the issue may have no comments
               import rest.github.EnhancedRestImplicits._
 
               // if there is a comment, the only reason why we need to get the issue is to get its number (we need it for the link)
               val issueResponse = Try(gitHubAPI.request[Issue](n.subject.url, userAuth.token).awaitNow).toOption
-              val comment = Option(n.subject.latest_comment_url).filter(_.nonEmpty).flatMap(url => Try(gitHubAPI.request[Comment](url, userAuth.token).awaitNow).toOption)
+              //val since = response.headers.lastModified.map(ZonedDateTime.parse(_, DateTimeFormatter.RFC_1123_DATE_TIME))
               for (issue <- issueResponse) yield {
-                val prefix = s"https://www.github.com/${n.repository.full_name}/issues/${issue.number}"
-                // if there is a last comment, obtain it, when not, use the issue
-                val (linkUrl, by, time, body) = comment.map { c =>
-                  println(s"Get comment ${c.id}")
-                  (prefix + "#issuecomment-" + c.id.toString, c.user.login, c.updated_at, c.body)
-                }.getOrElse {
-                  // this does not seem to happen normally - it seems the issue is also accessible as a comment
-                  println(s"Get issue ${issue.number}")
-                  (prefix, issue.user.login, issue.updated_at, issue.body)
-                }
+                println(s"issue ${n.repository.full_name} ${issue.number}")
+                // do not try getting comments when the latest_comment_url says there are none
+                val comments = if (n.subject.latest_comment_url != n.subject.url) Try {
+                  val commentsSince = gitHubAPI.api.authorized("Bearer " + userAuth.token)
+                    .repos(n.repository.owner.login, n.repository.name)
+                    .issuesAPI(issue.number)
+                    .comments(since = n.last_read_at)
+                    .awaitNow
+                    .data
+                  //println(s"commentsSince ${commentsSince.map(_.body).mkString("\n")}")
+                  // skip anything before (and including) my last answer - if I have answered, I have probably read it
+                  val commentsAfterMyAnswer = commentsSince
+                    .reverse
+                    .takeWhile(_.user.login != userAuth.login)
+                    .reverse
+                  //println(s"commentsAfterMyAnswer ${commentsAfterMyAnswer.map(_.body).mkString("\n")}")
 
-                val markdown = gitHubAPI.api.authorized("Bearer " + userAuth.token).markdown.markdown(body).awaitNow
-                n.subject.url -> CommentContent(
-                  linkUrl,
-                  s"#${issue.number}",
-                  HTMLUtils.xhtml(markdown.data), by, time
-                )
+                  // if nothing is obtained this way, use the latest_comment_url
+                  if (commentsAfterMyAnswer.isEmpty) {
+                    Seq(gitHubAPI.request[Comment](n.subject.latest_comment_url, userAuth.token).awaitNow)
+                  } else commentsAfterMyAnswer
+
+                }.toOption.toSeq.flatten else Seq.empty
+
+                val prefix = s"https://www.github.com/${n.repository.full_name}/issues/${issue.number}"
+                def issueData = (prefix, s"#${issue.number}", issue.user.login, issue.updated_at, issue.body)
+
+                val commentData = if (comments.nonEmpty) {
+                  val showIssue = if ((n.last_read_at == null || issue.created_at >= n.last_read_at) && issue.user.login != userAuth.login) {
+                    Seq(issueData)
+                  } else Seq.empty
+                  showIssue ++ comments.zipWithIndex.map { case (c, index) =>
+                    (s"$prefix#issuecomment-${c.id}", s"#${issue.number}(-${comments.size-index})", c.user.login, c.updated_at, c.body)
+                  }
+                } else Seq(issueData)
+
+                n.subject.url -> commentData.map { case (linkUrl, linkText, by, time, body) =>
+                  val markdown = gitHubAPI.api.authorized("Bearer " + userAuth.token).markdown.markdown(body).awaitNow
+                  CommentContent(
+                      linkUrl,
+                      linkText,
+                      HTMLUtils.xhtml(markdown.data), by, time
+                  )
+                }
               }
             case n if n.subject.`type` == "Release" =>
               import rest.github.EnhancedRestImplicits._
               val releaseResponse = Try(gitHubAPI.request[Release](n.subject.url, userAuth.token).awaitNow).toOption
               for (release <- releaseResponse) yield {
-                n.subject.url -> CommentContent(
+                n.subject.url -> Seq(CommentContent(
                   release.html_url,
                   s"${release.tag_name}",
                   release.body,
                   release.author.login,
                   release.published_at
-                )
+                ))
               }
             case n if n.subject.`type` == "CheckSuite" =>
               None
@@ -253,21 +290,15 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               None
           }
 
-          // remove any message reported as read (I do not think this ever happens, but if it would, we would handle it)
-          val unread = addUnread ++ oldUnread.diff(read)
-          val comments = recentSession.map(_.lastComments).getOrElse(Map.empty) ++ newComments
+          // remove comments for the messages we no longer display
+          val comments = recentSession.map(_.lastComments.filterKeys(unreadIds.contains)).getOrElse(Map.empty) ++ newComments
 
-          println(s"${userAuth.login}: since $ifModifiedSince new: ${newUnread.size}, read: ${read.size}, unread: ${unread.size}")
           // response content seems inconsistent. Sometimes it contains messages
-          def notificationHTML(n: common.model.github.Notification, comments: Map[String, CommentContent]) = {
+          def notificationHTML(n: common.model.github.Notification, comments: Map[String, Seq[CommentContent]]) = {
             //language=HTML
             val comment = comments.get(n.subject.url)
-            def ifComment(s: CommentContent => String) = comment.map(s).getOrElse("")
             val header = s"""
             <tr><td class="notification header">
-              <span class="message link">
-              ${ifComment(c => s"<a href='${c.linkUrl}'>${c.linkText}</a>")}
-              </span>
 
               <span class="message title">${n.subject.title}</span><br/>
               ${n.repository.full_name}
@@ -275,15 +306,19 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               <span class="message reason ${n.reason}">${n.reason}</span>
              </td></tr>
              """
-            comments.get(n.subject.url).map { commentHtml =>
-              header ++
+            comments.get(n.subject.url).map { cs =>
+              header + cs.map( c=>
                 s"""
-                   <tr><td class="notification signature">
-                   <span class="message by">${commentHtml.author}</span>
-                   <span class="message time"><time>${commentHtml.time}</time></span>
-                   </td></tr>
-                   <tr><td class="notification body article-content">${commentHtml.html}</td></tr>
-                   """
+                 <tr><td class="notification signature">
+                  <span class="message link">
+                  <a href="${c.linkUrl}">${c.linkText}</a>
+                  </span>
+                 <span class="message by">${c.author}</span>
+                 <span class="message time"><time>${c.time}</time></span>
+                 </td></tr>
+                 <tr><td class="notification body article-content">${c.html}</td></tr>
+                 """
+              ).mkString("\n")
             }.getOrElse(header)
           }
 
