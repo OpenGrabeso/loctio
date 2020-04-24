@@ -228,12 +228,16 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                   val commentsSince = gitHubAPI.api.authorized("Bearer " + userAuth.token)
                       .repos(n.repository.owner.login, n.repository.name)
                       .issuesAPI(issue.number)
-                      .comments(since = n.last_read_at).awaitNow
+                      .comments(since = n.last_read_at)
+                      .awaitNow
+                      .data
+                      // skip any issues the user have written until the first written by someone else
+                      .dropWhile(_.user.login == userAuth.login)
 
                   // if nothing is obtained this way, use the latest_comment_url
-                  if (commentsSince.data.isEmpty) {
+                  if (commentsSince.isEmpty) {
                     Seq(gitHubAPI.request[Comment](n.subject.latest_comment_url, userAuth.token).awaitNow)
-                  } else commentsSince.data
+                  } else commentsSince
 
                 }.toOption.toSeq.flatten else Seq.empty
 
