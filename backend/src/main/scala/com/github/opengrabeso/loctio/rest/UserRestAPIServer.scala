@@ -316,9 +316,10 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
             }
             // beware: two messages might have identical timestamps. Unlikely, but possible
             // such message may have a notification skipped
-          }.getOrElse(newUnread).take(5).reverse
+          }.getOrElse(newUnread)
 
-          val notifyUser = notifyUserAbout.map(_.subject.title)
+          val notifyUser = if (notifyUserAbout.lengthCompare(2) >= 0) Seq("New GitHub notifications")
+          else notifyUserAbout.headOption.toSeq.map(_.subject.title)
 
           val newSession = TraySession(
             recentSession.map(_.sessionStarted).getOrElse(now),
