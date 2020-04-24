@@ -2,7 +2,6 @@ package com.github.opengrabeso.loctio
 package rest
 
 import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
 import com.softwaremill.sttp.HttpURLConnectionBackend
@@ -17,6 +16,7 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 import shared.FutureAt._
 import shared.ChainingSyntax._
+import common.Util._
 
 object UserRestAPIServer {
   case class CommentContent(
@@ -252,11 +252,16 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                 }.toOption.toSeq.flatten else Seq.empty
 
                 val prefix = s"https://www.github.com/${n.repository.full_name}/issues/${issue.number}"
-                val commentData = if (comments.nonEmpty) comments.zipWithIndex.map { case (c, index) =>
-                  (s"$prefix#issuecomment-${c.id}", s"#${issue.number}(-${comments.size-index})", c.user.login, c.updated_at, c.body)
-                } else Seq {
-                  (prefix,s"#${issue.number}", issue.user.login, issue.updated_at, issue.body)
-                }
+                def issueData = (prefix, s"#${issue.number}", issue.user.login, issue.updated_at, issue.body)
+
+                val commentData = if (comments.nonEmpty) {
+                  val showIssue = if ((n.last_read_at == null || issue.created_at >= n.last_read_at) && issue.user.login != userAuth.login) {
+                    Seq(issueData)
+                  } else Seq.empty
+                  showIssue ++ comments.zipWithIndex.map { case (c, index) =>
+                    (s"$prefix#issuecomment-${c.id}", s"#${issue.number}(-${comments.size-index})", c.user.login, c.updated_at, c.body)
+                  }
+                } else Seq(issueData)
 
                 n.subject.url -> commentData.map { case (linkUrl, linkText, by, time, body) =>
                   val markdown = gitHubAPI.api.authorized("Bearer " + userAuth.token).markdown.markdown(body).awaitNow
