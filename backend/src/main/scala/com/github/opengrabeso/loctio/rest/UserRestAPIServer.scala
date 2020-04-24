@@ -31,7 +31,7 @@ object UserRestAPIServer {
     lastModified: Option[String], // lastModified HTTP headers used for notifications optimization
     lastPoll: ZonedDateTime, // last time when the user has polled notifications
     currentMesages: Seq[Notification],
-    lastComments: Map[String, CommentContent], // we use URL for identification, as this is sure to be stable for an issue
+    lastComments: Map[String, Seq[CommentContent]], // we use URL for identification, as this is sure to be stable for an issue
     mostRecentNotified: Option[ZonedDateTime] // most recent notification display to the user
   )
 
@@ -215,37 +215,55 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
               // if there is a comment, the only reason why we need to get the issue is to get its number (we need it for the link)
               val issueResponse = Try(gitHubAPI.request[Issue](n.subject.url, userAuth.token).awaitNow).toOption
-              val comment = Option(n.subject.latest_comment_url).filter(_.nonEmpty).flatMap(url => Try(gitHubAPI.request[Comment](url, userAuth.token).awaitNow).toOption)
+              // TODO: display only most recent (some time gate?)
               for (issue <- issueResponse) yield {
+                // do not try getting comments when the latest_comment_url says there are none
+                val comments = if (n.subject.latest_comment_url != n.subject.url) Try {
+                  val numberOfLast = 5
+                  val firstComments = gitHubAPI.api.authorized("Bearer " + userAuth.token)
+                      .repos(n.repository.owner.login, n.repository.name)
+                      .issuesAPI(issue.number)
+                      .comments(per_page = numberOfLast).awaitNow
+
+                  val lastPageHeader = firstComments.headers.paging.get("last")
+                  lastPageHeader.map { lastPageUrl =>
+                    val lastPageComments = gitHubAPI.requestWithHeaders[Comment](lastPageUrl, userAuth.token).awaitNow
+                    if (lastPageComments.data.size < numberOfLast) {
+                      // if there are too few last page comments, get the page before as well
+                      lastPageComments.headers.paging.get("prev").toSeq.flatMap { url =>
+                        gitHubAPI.requestWithHeaders[Comment](url, userAuth.token).awaitNow.data
+                      } ++ lastPageComments.data.takeRight(numberOfLast)
+                    } else lastPageComments.data
+                  }.getOrElse(firstComments.data)
+                }.toOption.toSeq.flatten else Seq.empty
+
                 val prefix = s"https://www.github.com/${n.repository.full_name}/issues/${issue.number}"
-                // if there is a last comment, obtain it, when not, use the issue
-                val (linkUrl, by, time, body) = comment.map { c =>
-                  println(s"Get comment ${c.id}")
-                  (prefix + "#issuecomment-" + c.id.toString, c.user.login, c.updated_at, c.body)
-                }.getOrElse {
-                  // this does not seem to happen normally - it seems the issue is also accessible as a comment
-                  println(s"Get issue ${issue.number}")
-                  (prefix, issue.user.login, issue.updated_at, issue.body)
+                val commentData = if (comments.nonEmpty) comments.zipWithIndex.map { case (c, index) =>
+                  (s"$prefix#issuecomment-${c.id}", s"#${issue.number}(-${comments.size-index})", c.user.login, c.updated_at, c.body)
+                } else Seq {
+                  (prefix,s"#${issue.number}", issue.user.login, issue.updated_at, issue.body)
                 }
 
-                val markdown = gitHubAPI.api.authorized("Bearer " + userAuth.token).markdown.markdown(body).awaitNow
-                n.subject.url -> CommentContent(
-                  linkUrl,
-                  s"#${issue.number}",
-                  HTMLUtils.xhtml(markdown.data), by, time
-                )
+                n.subject.url -> commentData.map { case (linkUrl, linkText, by, time, body) =>
+                  val markdown = gitHubAPI.api.authorized("Bearer " + userAuth.token).markdown.markdown(body).awaitNow
+                  CommentContent(
+                      linkUrl,
+                      linkText,
+                      HTMLUtils.xhtml(markdown.data), by, time
+                  )
+                }
               }
             case n if n.subject.`type` == "Release" =>
               import rest.github.EnhancedRestImplicits._
               val releaseResponse = Try(gitHubAPI.request[Release](n.subject.url, userAuth.token).awaitNow).toOption
               for (release <- releaseResponse) yield {
-                n.subject.url -> CommentContent(
+                n.subject.url -> Seq(CommentContent(
                   release.html_url,
                   s"${release.tag_name}",
                   release.body,
                   release.author.login,
                   release.published_at
-                )
+                ))
               }
             case n if n.subject.`type` == "CheckSuite" =>
               None
@@ -259,15 +277,11 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
           println(s"${userAuth.login}: since $ifModifiedSince new: ${newUnread.size}, read: ${read.size}, unread: ${unread.size}")
           // response content seems inconsistent. Sometimes it contains messages
-          def notificationHTML(n: common.model.github.Notification, comments: Map[String, CommentContent]) = {
+          def notificationHTML(n: common.model.github.Notification, comments: Map[String, Seq[CommentContent]]) = {
             //language=HTML
             val comment = comments.get(n.subject.url)
-            def ifComment(s: CommentContent => String) = comment.map(s).getOrElse("")
             val header = s"""
             <tr><td class="notification header">
-              <span class="message link">
-              ${ifComment(c => s"<a href='${c.linkUrl}'>${c.linkText}</a>")}
-              </span>
 
               <span class="message title">${n.subject.title}</span><br/>
               ${n.repository.full_name}
@@ -275,15 +289,19 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               <span class="message reason ${n.reason}">${n.reason}</span>
              </td></tr>
              """
-            comments.get(n.subject.url).map { commentHtml =>
-              header ++
+            comments.get(n.subject.url).map { cs =>
+              header + cs.map( c=>
                 s"""
-                   <tr><td class="notification signature">
-                   <span class="message by">${commentHtml.author}</span>
-                   <span class="message time"><time>${commentHtml.time}</time></span>
-                   </td></tr>
-                   <tr><td class="notification body article-content">${commentHtml.html}</td></tr>
-                   """
+                 <tr><td class="notification signature">
+                  <span class="message link">
+                  <a href="${c.linkUrl}">${c.linkText}</a>
+                  </span>
+                 <span class="message by">${c.author}</span>
+                 <span class="message time"><time>${c.time}</time></span>
+                 </td></tr>
+                 <tr><td class="notification body article-content">${c.html}</td></tr>
+                 """
+              ).mkString("\n")
             }.getOrElse(header)
           }
 
