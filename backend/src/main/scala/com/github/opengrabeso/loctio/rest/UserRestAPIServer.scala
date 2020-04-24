@@ -205,16 +205,20 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           val (newUnread, read) = response.data.partition(_.unread)
 
           val oldUnread = recentSession.filter(_.lastModified.nonEmpty).map(_.currentMesages).getOrElse(Seq.empty)
-          val oldUnreadIds = oldUnread.map(_.id).toSet // cannot compare Notification object, does not have a value based equals
-          val readIds = read.map(_.id).toSet
+          // cannot compare Notification object, does not have a value based equals
+          val newUnreadIds = newUnread.map(_.subject.url).toSet
+          val readIds = read.map(_.subject.url).toSet
 
-          // add messages reported as unread, but only when they are not present yet, insert recent messages first
-          val addUnread = newUnread.filterNot(n => oldUnreadIds.contains(n.id))
+          // when a notification with the same id is issues again, it means the topic was updated
+          // and we need to re-download the content
+          val keepUnread = oldUnread.filterNot(n => newUnreadIds.contains(n.subject.url) || readIds.contains(n.subject.url))
           // remove any message reported as read (I do not think this ever happens, but if it would, we would handle it)
-          val unread = addUnread ++ oldUnread.filterNot(n => readIds.contains(n.id))
+          val unread = newUnread ++ keepUnread
+          val unreadIds = unread.map(_.subject.url).toSet
 
+          println(s"${userAuth.login}: since $ifModifiedSince new: ${newUnread.size}, read: ${read.size}, unread: ${unread.size}")
           // download last comments for the new content
-          val newComments = addUnread.flatMap {
+          val newComments = newUnread.flatMap {
             case n if n.subject.`type` == "Issue" =>
               // the issue may have no comments
               import rest.github.EnhancedRestImplicits._
@@ -223,21 +227,27 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               val issueResponse = Try(gitHubAPI.request[Issue](n.subject.url, userAuth.token).awaitNow).toOption
               //val since = response.headers.lastModified.map(ZonedDateTime.parse(_, DateTimeFormatter.RFC_1123_DATE_TIME))
               for (issue <- issueResponse) yield {
+                println(s"issue ${n.repository.full_name} ${issue.number}")
                 // do not try getting comments when the latest_comment_url says there are none
                 val comments = if (n.subject.latest_comment_url != n.subject.url) Try {
                   val commentsSince = gitHubAPI.api.authorized("Bearer " + userAuth.token)
-                      .repos(n.repository.owner.login, n.repository.name)
-                      .issuesAPI(issue.number)
-                      .comments(since = n.last_read_at)
-                      .awaitNow
-                      .data
-                      // skip any issues the user have written until the first written by someone else
-                      .dropWhile(_.user.login == userAuth.login)
+                    .repos(n.repository.owner.login, n.repository.name)
+                    .issuesAPI(issue.number)
+                    .comments(since = n.last_read_at)
+                    .awaitNow
+                    .data
+                  //println(s"commentsSince ${commentsSince.map(_.body).mkString("\n")}")
+                  // skip anything before (and including) my last answer - if I have answered, I have probably read it
+                  val commentsAfterMyAnswer = commentsSince
+                    .reverse
+                    .takeWhile(_.user.login != userAuth.login)
+                    .reverse
+                  //println(s"commentsAfterMyAnswer ${commentsAfterMyAnswer.map(_.body).mkString("\n")}")
 
                   // if nothing is obtained this way, use the latest_comment_url
-                  if (commentsSince.isEmpty) {
+                  if (commentsAfterMyAnswer.isEmpty) {
                     Seq(gitHubAPI.request[Comment](n.subject.latest_comment_url, userAuth.token).awaitNow)
-                  } else commentsSince
+                  } else commentsAfterMyAnswer
 
                 }.toOption.toSeq.flatten else Seq.empty
 
@@ -275,9 +285,9 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               None
           }
 
-          val comments = recentSession.map(_.lastComments).getOrElse(Map.empty) ++ newComments
+          // remove comments for the messages we no longer display
+          val comments = recentSession.map(_.lastComments.filterKeys(unreadIds.contains)).getOrElse(Map.empty) ++ newComments
 
-          println(s"${userAuth.login}: since $ifModifiedSince new: ${newUnread.size}, read: ${read.size}, unread: ${unread.size}")
           // response content seems inconsistent. Sometimes it contains messages
           def notificationHTML(n: common.model.github.Notification, comments: Map[String, Seq[CommentContent]]) = {
             //language=HTML
