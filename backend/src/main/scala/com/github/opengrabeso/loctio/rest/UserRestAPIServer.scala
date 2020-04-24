@@ -177,7 +177,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
   }
 
   def trayNotificationsHTML() = syncResponse {
-    val sttpBackend = HttpURLConnectionBackend()
+    val sttpBackend = new SttpBackendAsyncWrapper(HttpURLConnectionBackend())(executeNow)
     try {
 
       val gitHubAPI = new GitHubAPIClient(sttpBackend)
@@ -214,8 +214,8 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               import rest.github.EnhancedRestImplicits._
 
               // if there is a comment, the only reason why we need to get the issue is to get its number (we need it for the link)
-              val issueResponse = Try(gitHubAPI.request[Issue](n.subject.url, userAuth.token)).toOption
-              val comment = Option(n.subject.latest_comment_url).filter(_.nonEmpty).flatMap(url => Try(gitHubAPI.request[Comment](url, userAuth.token)).toOption)
+              val issueResponse = Try(gitHubAPI.request[Issue](n.subject.url, userAuth.token).awaitNow).toOption
+              val comment = Option(n.subject.latest_comment_url).filter(_.nonEmpty).flatMap(url => Try(gitHubAPI.request[Comment](url, userAuth.token).awaitNow).toOption)
               for (issue <- issueResponse) yield {
                 val prefix = s"https://www.github.com/${n.repository.full_name}/issues/${issue.number}"
                 // if there is a last comment, obtain it, when not, use the issue
@@ -237,7 +237,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               }
             case n if n.subject.`type` == "Release" =>
               import rest.github.EnhancedRestImplicits._
-              val releaseResponse = Try(gitHubAPI.request[Release](n.subject.url, userAuth.token)).toOption
+              val releaseResponse = Try(gitHubAPI.request[Release](n.subject.url, userAuth.token).awaitNow).toOption
               for (release <- releaseResponse) yield {
                 n.subject.url -> CommentContent(
                   release.html_url,
