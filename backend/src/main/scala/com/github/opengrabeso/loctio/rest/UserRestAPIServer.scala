@@ -291,7 +291,8 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           }
 
           // remove comments for the messages we no longer display
-          val comments = recentSession.map(_.lastComments.filterKeys(unreadIds.contains)).getOrElse(Map.empty) ++ newComments
+          // map(identity) is a workaround for https://github.com/scala/bug/issues/6654
+          val comments = recentSession.map(_.lastComments.filterKeys(unreadIds.contains).map(identity)).getOrElse(Map.empty) ++ newComments
 
           // response content seems inconsistent. Sometimes it contains messages
           def notificationHTML(n: common.model.github.Notification, comments: Map[String, Seq[CommentContent]]) = {
