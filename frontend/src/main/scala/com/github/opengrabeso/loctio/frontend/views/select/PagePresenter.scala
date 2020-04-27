@@ -153,6 +153,11 @@ class PagePresenter(
     userAPI.setLocationName(login, location).onComplete(loadUsersCallback(currentToken, _))
   }
 
+  def addUser(user: String): Unit = {
+    // when we add a user, it is because we want to watch them
+    userAPI.requestWatching(user).onComplete(loadUsersCallback(currentToken, _))
+  }
+
   def changeUserState(s: String): Unit = {
     properties.subProp(_.state).set(s)
     SettingsModel.store(properties.get)
