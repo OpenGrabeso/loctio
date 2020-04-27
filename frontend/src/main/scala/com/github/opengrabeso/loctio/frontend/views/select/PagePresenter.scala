@@ -150,8 +150,7 @@ class PagePresenter(
   }
 
   def setLocationName(login: String, location: String): Unit = {
-    val token = currentToken
-    userAPI.setLocationName(login, location).onComplete(loadUsersCallback(token, _))
+    userAPI.setLocationName(login, location).onComplete(loadUsersCallback(currentToken, _))
   }
 
   def changeUserState(s: String): Unit = {
@@ -160,6 +159,20 @@ class PagePresenter(
     refreshUsers()
   }
 
+  def requestWatching(login: String) = {
+    userAPI.requestWatching(login).onComplete(loadUsersCallback(currentToken, _))
+  }
+
+  def stopWatching(login: String) = {
+    userAPI.stopWatching(login).onComplete(loadUsersCallback(currentToken, _))
+  }
+  def allowWatchingMe(login: String) = {
+    userAPI.allowWatchingMe(login).onComplete(loadUsersCallback(currentToken, _))
+  }
+
+  def disallowWatchingMe(login: String) = {
+    userAPI.disallowWatchingMe(login).onComplete(loadUsersCallback(currentToken, _))
+  }
 
   override def handleState(state: SelectPageState.type): Unit = {}
 }

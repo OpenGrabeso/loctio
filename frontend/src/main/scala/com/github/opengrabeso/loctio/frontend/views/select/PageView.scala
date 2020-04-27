@@ -83,9 +83,18 @@ class PageView(
         UdashDropdown.DefaultDropdownItem.Button("Name location", callback),
       )
       val states = Seq("invisible", "online", "busy")
-      if (current) base ++ states.filter(_ != state).map(s =>
-        UdashDropdown.DefaultDropdownItem.Button(s"Make $s", () => presenter.changeUserState(s)),
-      ) else base
+      if (current) base ++ states.filter(_ != state).flatMap(s =>
+        Seq(UdashDropdown.DefaultDropdownItem.Button(s"Make $s", () => presenter.changeUserState(s))),
+      ) else {
+        Seq(
+          // TODO: decide which items to allow
+          UdashDropdown.DefaultDropdownItem.Button(s"Request watching", () => presenter.requestWatching(ar.login)),
+          UdashDropdown.DefaultDropdownItem.Button(s"Stop watching", () => presenter.stopWatching(ar.login)),
+          UdashDropdown.DefaultDropdownItem.Button(s"Disallow watching me", () => presenter.disallowWatchingMe(ar.login)),
+          UdashDropdown.DefaultDropdownItem.Button(s"Allow watching me", () => presenter.allowWatchingMe(ar.login)),
+        )
+
+      }
     }
 
     val dropdown = UdashDropdown.default(items)(_ => Seq[Modifier]("", Button.color(Color.Primary)))

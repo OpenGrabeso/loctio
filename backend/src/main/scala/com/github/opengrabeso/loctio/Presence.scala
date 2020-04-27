@@ -7,6 +7,38 @@ import common.model._
 import common.FileStore.FullName
 
 object Presence {
+  // contacts/xxx/watching contains list of users we want to watch
+  // contacts/xxx/watched-by contains list of users that want to watch us, we allow it by storing true:java.lang.Boolean in the file
+
+  def pathWatching(login: String, user: String) = s"contacts/$login/watching/$user"
+  def pathWatchedBy(login: String, user: String) = s"contacts/$login/watched-by/$user"
+
+  def b(boolean: Boolean) = new java.lang.Boolean(boolean)
+
+  def requestWatching(login: String, user: String) = {
+    Storage.store(FullName(pathWatching(login, user)), b(false)) // value has no meaning
+    // if the request already exists, do not touch it, to prevent overwritting request which was allowed
+    if (Storage.enumerate(pathWatchedBy(user, login)).isEmpty) {
+      Storage.store(FullName(pathWatchedBy(user, login)), b(false))
+    }
+  }
+
+  def stopWatching(login: String, user: String) = {
+    Storage.delete(FullName(pathWatching(login, user)))
+    // the fact we stop watching does not mean the user has withdrawn their consent - delete only when not containing true
+    if (!Storage.load[java.lang.Boolean](FullName(pathWatchedBy(user, login))).contains(true)) {
+      Storage.delete(FullName(pathWatchedBy(user, login)))
+    }
+  }
+
+  def disallowWatchingMe(login: String, user: String) = {
+    Storage.store(FullName(pathWatchedBy(login, user)), b(false)) // the request still exists, only no longer contains true
+  }
+
+  def allowWatchingMe(login: String, user: String) = {
+    Storage.store(FullName(pathWatchedBy(login, user)), b(true))
+  }
+
   @SerialVersionUID(20L)
   case class PresenceInfo(
     ipAddress: String,
@@ -31,9 +63,11 @@ object Presence {
     val watching = enumerate(s"contacts/$forUser/watching/").toSeq.map(_._2).filter(_.nonEmpty)
     val watchedBy = enumerate(s"contacts/$forUser/watched-by/").toSeq.map(_._2).filter(_.nonEmpty)
 
-    val (watchingAllowed, watchingRequested) = watching.partition(user => enumerate(s"contacts/$user/watched-by").nonEmpty)
+    val (watchingAllowed, watchingRequested) = watching.partition { user =>
+      load[java.lang.Boolean](FullName(pathWatchedBy(user, forUser))).contains(true)
+    }
 
-    val fullState = watchingAllowed
+    val fullState = (forUser +: watchingAllowed)
       .map(user => user -> load[PresenceInfo](FullName(s"state/$user")))
       .map { case (login, data) =>
         data.map { d =>

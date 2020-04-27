@@ -30,6 +30,14 @@ trait UserRestAPI {
   @POST
   @CustomBody
   def shutdown(data: RestString): Future[Unit]
+
+  def requestWatching(user: String): Future[Seq[(String, LocationInfo)]]
+
+  def stopWatching(user: String): Future[Seq[(String, LocationInfo)]]
+
+  def allowWatchingMe(user: String): Future[Seq[(String, LocationInfo)]]
+
+  def disallowWatchingMe(user: String): Future[Seq[(String, LocationInfo)]]
 }
 
 object UserRestAPI extends RestApiCompanion[EnhancedRestImplicits,UserRestAPI](EnhancedRestImplicits) {

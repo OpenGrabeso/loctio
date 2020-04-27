@@ -88,6 +88,27 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
     listUsersSync(ipAddress, state, true)
   }
 
+
+  def requestWatching(user: String) = syncResponse {
+    Presence.requestWatching(userAuth.login, user)
+    Presence.listUsers(userAuth.login, true)
+  }
+
+  def stopWatching(user: String) = syncResponse {
+    Presence.stopWatching(userAuth.login, user)
+    Presence.listUsers(userAuth.login, true)
+  }
+
+  def allowWatchingMe(user: String) = syncResponse {
+    Presence.allowWatchingMe(userAuth.login, user)
+    Presence.listUsers(userAuth.login, true)
+  }
+
+  def disallowWatchingMe(user: String) = syncResponse {
+    Presence.disallowWatchingMe(userAuth.login, user)
+    Presence.listUsers(userAuth.login, true)
+  }
+
   def trayUsersHTML(ipAddress: String, state: String) = syncResponse {
 
     val us = listUsersSync(ipAddress, state)
@@ -158,7 +179,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
     // check last ip address for the user
     Presence.getUser(login).map { presence =>
       Locations.nameLocation(presence.ipAddress, name)
-      Presence.listUsers(userAuth.login)
+      Presence.listUsers(userAuth.login, true)
     }.getOrElse(throw HttpErrorException(500, "User presence not found"))
   }
 

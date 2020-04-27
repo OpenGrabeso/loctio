@@ -107,6 +107,9 @@ object Storage extends common.FileStore {
         println(s"load error ${x.getMessage} - $fullName")
         storage.delete(fileId(fullName.name))
         None
+      case _: java.io.EOFException =>
+        println(s"Short (most likely empty) file $fullName")
+        None
       case x: Exception =>
         x.printStackTrace()
         None
