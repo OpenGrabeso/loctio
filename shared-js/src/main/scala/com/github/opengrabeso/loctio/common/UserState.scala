@@ -72,8 +72,16 @@ object UserState {
     def userLowerThan(a: UserRow, b: UserRow): Boolean = {
       def userGroup(a: UserRow) = {
         if (a.login == currentUser) 0 // current user first
-        else if (a.currentState != "offline") 1 // all other users
-        else 2 // offline goes last
+        else a.currentState match {
+          case "online" | "busy" | "away" =>
+            1
+          case "offline" =>
+            2
+          case "unknown" =>
+            3
+          case _ =>
+            1000 // something unexpected, list last
+        }
       }
       val aLevel = userGroup(a)
       val bLevel = userGroup(b)

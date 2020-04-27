@@ -102,7 +102,7 @@ class PageView(
       TableFactory.TableAttrib("Location", (ar, _, _) => ar.location.render),
       TableFactory.TableAttrib(
         "Last seen",
-        (ar, _, _) => if (ar.currentState != "online" && ar.currentState != "busy") common.UserState.smartTime(ar.lastTime, formatTime, formatDate, formatDayOfWeek).render else ""
+        (ar, _, _) => if (ar.currentState != "online" && ar.currentState != "busy" && ar.currentState != "unknown") common.UserState.smartTime(ar.lastTime, formatTime, formatDate, formatDayOfWeek).render else ""
       ),
       TableFactory.TableAttrib("", (ar, _, _) => userDropDown(ar)),
     )
