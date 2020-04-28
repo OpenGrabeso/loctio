@@ -103,6 +103,7 @@ class PagePresenter(
       //model.subProp(_.debug).set(s"Last active at $lastActive")
     })
 
+    /* web page shutdown messes with the Tray utility, it is better not to report it
     // register the shutdown handler (beacon)
     val debugBeacon = false
     def onUnload() = dom.window.navigator.asInstanceOf[js.Dynamic].sendBeacon(s"/rest/user/$token/shutdown", "now")
@@ -111,6 +112,7 @@ class PagePresenter(
     } else {
       jQ(dom.window).on("unload", (_, _) => onUnload())
     }
+    */
   }
 
   def init(): Unit = {

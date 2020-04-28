@@ -93,9 +93,9 @@ object UserState {
     //println(s"Users:\n${value.mkString("\n")}")
     value.map { u =>
       if (u._1 == currentUser) {
-        UserRow(u._1, u._2.location, u._2.lastSeen, currentUserState)
+        UserRow(u._1, u._2.location, u._2.lastSeen, currentUserState, u._2.iAmWatching, u._2.iAmWatchedBy)
       } else {
-        UserRow(u._1, u._2.location, u._2.lastSeen, getEffectiveUserStatus(u._2.state, u._2.lastSeen))
+        UserRow(u._1, u._2.location, u._2.lastSeen, getEffectiveUserStatus(u._2.state, u._2.lastSeen), u._2.iAmWatching, u._2.iAmWatchedBy)
       }
     }.sortWith(userLowerThan)
 

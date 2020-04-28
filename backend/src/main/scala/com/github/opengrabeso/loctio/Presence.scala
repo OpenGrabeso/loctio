@@ -66,6 +66,15 @@ object Presence {
     val (watchingAllowed, watchingRequested) = watching.partition { user =>
       load[java.lang.Boolean](FullName(pathWatchedBy(user, forUser))).contains(true)
     }
+    val (watchedByAllowed, watchedByRequested) = watchedBy.partition { user =>
+      load[java.lang.Boolean](FullName(pathWatchedBy(forUser, user))).contains(true)
+    }
+
+    def relation(listAllowed: Seq[String], listRequested: Seq[String], user: String): Relation = {
+      if (listAllowed.contains(user)) Relation.Yes
+      else if (listRequested.contains(user)) Relation.Requested
+      else Relation.No
+    }
 
     val fullState = (forUser +: watchingAllowed)
       .map(user => user -> load[PresenceInfo](FullName(s"state/$user")))
@@ -78,23 +87,22 @@ object Presence {
           // when one client has reported going offline, there still may be other clients running
           val state = if (age < 70 && d.state == "offline") "online" else d.state
           //println(s"Report $login as $d")
-          login -> LocationInfo(Locations.locationFromIpAddress(d.ipAddress), lastSeen, state)
-        }.getOrElse(login -> LocationInfo("", now, "unknown"))
+          val watchedBy = relation(watchedByAllowed, watchedByRequested, login)
+          login -> LocationInfo(Locations.locationFromIpAddress(d.ipAddress), lastSeen, state, Relation.Yes, watchedBy)
+        }.getOrElse(login -> LocationInfo("", now, "unknown", Relation.No, Relation.No))
       }
     if (requests) {
-      val (watchedByAllowed, watchedByRequested) = watchedBy.partition(user => enumerate(s"contacts/$forUser/watched-by").nonEmpty)
 
       def createUserInfo(user: String, state: String) = {
-        user -> LocationInfo(state, now, "unknown")
+        val watching = relation(watchingAllowed, watchingRequested, user)
+        val watchedBy = relation(watchedByAllowed, watchedByRequested, user)
+        user -> LocationInfo(state, now, "unknown", watching, watchedBy)
       }
 
       // TODO: append those who want to watch us, but we are not watching them
+      val partialState = ((watching ++ watchedBy).toSet -- watchingAllowed).toSeq.map(createUserInfo(_, ""))
       // TODO: merge states as necessary
-      fullState ++
-        watchedByAllowed.diff(watchingAllowed).map(createUserInfo(_, "Watching me")) ++
-        watchingRequested.diff(watchingAllowed).map(createUserInfo(_, "Watch request sent")) ++
-        watchedByRequested.diff(watchingAllowed).map(createUserInfo(_, "Requesting to watch me"))
-
+      fullState ++ partialState
     } else fullState
   }
 }

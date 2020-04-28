@@ -5,7 +5,7 @@ package select
 
 import java.time.{Duration, ZonedDateTime}
 
-import common.model.UserRow
+import common.model.{Relation, UserRow}
 import common.css._
 import io.udash._
 import io.udash.bootstrap.button.UdashButton
@@ -15,6 +15,7 @@ import io.udash.bootstrap.utils.BootstrapStyles._
 import io.udash.bootstrap.table.UdashTable
 import io.udash.css._
 import io.udash.rest.raw.HttpErrorException
+import org.scalajs.dom.Node
 import scalatags.JsDom.all._
 
 class PageView(
@@ -38,7 +39,7 @@ class PageView(
   val addUserOkButton = UdashButton(Color.Success.toProperty)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "OK"))
 
   val addUserLogin = Property[String]("")
-  val addUserButton = UdashButton(Color.Success.toProperty)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "Add user..."))
+  val addUserButton = UdashButton(Color.Secondary.toProperty)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "Watch user..."))
 
   buttonOnClick(locationOkButton) {
     presenter.setLocationName(setLocationUser.get, setLocationLocation.get)
@@ -146,12 +147,26 @@ class PageView(
         "Last seen",
         (ar, _, _) => if (ar.currentState != "online" && ar.currentState != "busy" && ar.currentState != "unknown") common.UserState.smartTime(ar.lastTime, formatTime, formatDate, formatDayOfWeek).render else ""
       ),
+      TableFactory.TableAttrib("Watching me", (ar, _, _) => ar.watchingMe.toString.render),
+      TableFactory.TableAttrib("", (ar, _, _) => userDropDown(ar)),
+    )
+    val partialAttribs = Seq[DisplayAttrib](
+      TableFactory.TableAttrib("", (ar, _, _) => Seq[Modifier](s.statusTd, getUserStatusIcon(ar.currentState).render)),
+      TableFactory.TableAttrib("User", (ar, _, _) => ar.login.render),
+      TableFactory.TableAttrib("Watch", (ar, _, _) => ar.watch.toString.render),
+      TableFactory.TableAttrib("Watching me", (ar, _, _) => ar.watchingMe.toString.render),
       TableFactory.TableAttrib("", (ar, _, _) => userDropDown(ar)),
     )
 
-    val table = UdashTable(model.subSeq(_.users), striped = true.toProperty, bordered = true.toProperty, hover = true.toProperty, small = true.toProperty)(
+    val usersFull = model.subSeq(_.users).filter(_.watch == Relation.Yes)
+    val usersPartial = model.subSeq(_.users).filter(_.watch != Relation.Yes)
+    val table = UdashTable(usersFull, striped = true.toProperty, bordered = true.toProperty, hover = true.toProperty, small = true.toProperty)(
       headerFactory = Some(TableFactory.headerFactory(attribs)),
       rowFactory = TableFactory.rowFactory(attribs)
+    )
+    val tablePartial = UdashTable(usersPartial, striped = true.toProperty, bordered = true.toProperty, hover = true.toProperty, small = true.toProperty)(
+      headerFactory = Some(TableFactory.headerFactory(partialAttribs)),
+      rowFactory = TableFactory.rowFactory(partialAttribs)
     )
 
     def getErrorText(ex: Throwable) = ex match {
@@ -174,7 +189,8 @@ class PageView(
               div(
                 bind(model.subProp(_.error).transform(_.map(ex => s"Error ${getErrorText(ex)}").orNull)),
                 table.render,
-                addUserButton.render
+                addUserButton.render,
+                showIf(usersPartial.transform(_.nonEmpty))(Seq(tablePartial.render)),
               ).render
             )
           )
