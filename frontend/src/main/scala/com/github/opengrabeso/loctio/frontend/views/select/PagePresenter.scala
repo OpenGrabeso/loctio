@@ -52,6 +52,7 @@ class PagePresenter(
         println(s"Login - new user $r")
         properties.subProp(_.login).set(r._1)
         properties.subProp(_.fullName).set(r._2)
+        properties.subProp(_.role).set(r._3)
         loginFor.success(UserContextData(r._1, token))
 
         for {
@@ -155,9 +156,13 @@ class PagePresenter(
     userAPI.setLocationName(login, location).onComplete(loadUsersCallback(currentToken, _))
   }
 
-  def addUser(user: String): Unit = {
+  def watchUser(user: String): Unit = {
     // when we add a user, it is because we want to watch them
     userAPI.requestWatching(user).onComplete(loadUsersCallback(currentToken, _))
+  }
+
+  def addUser(user: String): Unit = {
+    userAPI.addUser(user)
   }
 
   def changeUserState(s: String): Unit = {

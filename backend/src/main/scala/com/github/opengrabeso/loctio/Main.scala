@@ -11,25 +11,6 @@ object Main extends common.Formatting {
 
   import RequestUtils._
 
-  case class SecretResult(users: Set[String], error: String)
-
-  def secret: SecretResult = {
-    val filename = "/secret.txt"
-    try {
-      val secretStream = Main.getClass.getResourceAsStream(filename)
-      val lines = scala.io.Source.fromInputStream(secretStream).getLines
-      val usersLine = lines.next()
-      val users = usersLine.split(",").map(_.trim.toLowerCase)
-      secretStream.close()
-      SecretResult(users.toSet, "")
-    } catch {
-      case _: NullPointerException => // no file found
-        SecretResult(Set.empty, s"Missing $filename, app developer should check README.md")
-      case _: Exception =>
-        SecretResult(Set.empty, s"Bad $filename, app developer should check README.md")
-    }
-  }
-
   def devMode: Boolean = {
     Option(getClass.getResourceAsStream("/config.properties")).exists { is =>
       val prop = new Properties()
@@ -64,10 +45,29 @@ object Main extends common.Formatting {
     }
   }
 
+
+  def checkUserAuthorized(login: String) = {
+    Storage.enumerate(s"users/$login").nonEmpty
+  }
+
+  def checkAdminAuthorized(login: String) = {
+    Storage.enumerate(s"admins/$login").nonEmpty
+  }
+
   def authorized(login: String): Unit = {
-    val SecretResult(users, _) = secret
-    if (!users.contains(login.toLowerCase)) {
-      throw HttpErrorException(403, s"User $login not authorized. Contact server administrator to get the access")
+    // admins are always authorized, no need to list them
+    // check normal user list
+    if (!checkUserAuthorized(login)) {
+      if (!checkAdminAuthorized(login)) {
+        throw HttpErrorException(403, s"User $login not authorized. Contact server administrator to get the access")
+      }
+    }
+  }
+
+  def authorizedAdmin(login: String): Unit = {
+    // admins are always authorized, no need to list them
+    if (!checkAdminAuthorized(login)) {
+      throw HttpErrorException(403, s"Admin $login not authorized. Contact server administrator to get the access")
     }
   }
 

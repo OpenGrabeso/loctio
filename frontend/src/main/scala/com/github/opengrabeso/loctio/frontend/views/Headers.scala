@@ -12,6 +12,7 @@ import io.udash.bootstrap.modal.UdashModal
 import io.udash.bootstrap.utils.BootstrapStyles._
 import io.udash.css._
 import org.scalajs.dom
+import org.scalajs.dom.Node
 import org.scalajs.dom.raw.HTMLElement
 
 object Headers {
@@ -19,6 +20,8 @@ object Headers {
     def gotoMain(): Unit = application.goTo(SelectPageState)
   }
   abstract class PageView[T<: State](model: ModelProperty[PageModel], presenter: PagePresenter[T]) extends CssView with PageUtils {
+    def onAdminClick(): Unit
+
     import scalatags.JsDom.all._
 
     protected def globals = model.subModel(_.settings)
@@ -58,6 +61,9 @@ object Headers {
       settingsModal.show()
     }
 
+    buttonOnClick(adminButton) {
+      onAdminClick()
+    }
     val prefix = Seq[Modifier](
       // loads Bootstrap and FontAwesome styles from CDN
       UdashBootstrap.loadBootstrapStyles(),
@@ -96,7 +102,11 @@ object Headers {
           ),
         ),
         div(Flex.grow1()),
-        td(adminButton)
+        showIf(globals.subProp(_.role).transform(_ == "admin")) (
+          Seq[Node](
+            td(adminButton).render
+          )
+        )
       ).render
     }
 
