@@ -51,7 +51,7 @@ object Headers {
     )
 
     private val settingsButton = button("Log in".toProperty)
-    private val adminButton = faIconButton("cogs", "Site administration".toProperty)
+    private val adminButton = faIconButton("cogs", " Site administration".toProperty)
 
     buttonOnClick(settingsButton) {
       settingsToken.set("")
@@ -72,36 +72,31 @@ object Headers {
       val userId = globals.subProp(_.login)
 
       div(
+        Display.flex(),
+        Flex.row(),
         //GlobalStyles.header,
         id := "header",
         settingsModal,
-        table(
-          tbody(
-            tr(
-              td(settingsButton),
-              td(
-                table(
-                  tbody(
-                    tr(td(a(
-                      href := "/", appName,
-                      onclick :+= {_: dom.Event =>
-                        presenter.gotoMain()
-                        true
-                      }
-                    ))),
-                    tr(td(
-                      "User: ",
-                      produce(userId) { s =>
-                        a(href := s"https://www.github.com/$s", bind(name)).render
-                      }
-                    ))
-                  )
-                )
-              ),
-              td(adminButton)
-            )
-          )
-        )
+        settingsButton,
+        div(
+          Display.flex(),
+          Flex.column(),
+          a(
+            href := "/", appName,
+            onclick :+= {_: dom.Event =>
+              presenter.gotoMain()
+              true
+            }
+          ),
+          div(
+            "User: ",
+            produce(userId) { s =>
+              a(href := s"https://www.github.com/$s", bind(name)).render
+            }
+          ),
+        ),
+        div(Flex.grow1()),
+        td(adminButton)
       ).render
     }
 
@@ -118,10 +113,10 @@ object Headers {
         GlobalStyles.footerText,
         " © 2020 ",
         a(
-          href := s"https://github.com/OndrejSpanel/$gitHubName",
+          href := s"https://github.com/gamatron/$gitHubName",
           GlobalStyles.footerLink,
+          "Ondřej Španěl",
         ),
-        "Ondřej Španěl",
         div()
       )
     ).render
