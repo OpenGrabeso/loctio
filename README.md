@@ -1,9 +1,18 @@
 Loctio
 ======
 
+Presence / location
+-------------------
+
 The application tracks presence / location for the users connecting to it based on their IP address.
 
-Users are identified by providing GitHub access token (a token with no scopes at all is enough).
+Users are identified by providing GitHub access token. For this purpose a token with no scopes is enough. If you
+want to use notifications (see below), scopes `notifications` and `repo` should be present on the token. 
+
+Notifications
+-------------
+
+The utility also listens for GitHub notifications and displays them.
 
 Developer notes
 ---------------
