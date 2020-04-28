@@ -17,7 +17,7 @@ object Presence {
 
   def requestWatching(login: String, user: String) = {
     Storage.store(FullName(pathWatching(login, user)), b(false)) // value has no meaning
-    // if the request already exists, do not touch it, to prevent overwritting request which was allowed
+    // if the request already exists, do not touch it, to prevent overwriting request which was allowed
     if (Storage.enumerate(pathWatchedBy(user, login)).isEmpty) {
       Storage.store(FullName(pathWatchedBy(user, login)), b(false))
     }
