@@ -51,6 +51,7 @@ object Headers {
     )
 
     private val settingsButton = button("Log in".toProperty)
+    private val adminButton = faIconButton("cogs", "Site administration".toProperty)
 
     buttonOnClick(settingsButton) {
       settingsToken.set("")
@@ -77,9 +78,7 @@ object Headers {
         table(
           tbody(
             tr(
-              td(
-                settingsButton
-              ),
+              td(settingsButton),
               td(
                 table(
                   tbody(
@@ -98,7 +97,8 @@ object Headers {
                     ))
                   )
                 )
-              )
+              ),
+              td(adminButton)
             )
           )
         )

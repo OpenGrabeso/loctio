@@ -10,7 +10,7 @@ Developer notes
 
 The application project is created in InteliJ IDEA, the project is deployed as Google App Engine.
 If you want to deploy your own build, you need to provide:
- - a list of GitHub users which can access the server
+ - a list of GitHub users which will become admins (can invite and kick other uses)
 
 Put them in a file `resources/secret.txt`, list users on the first line, separated with commas, like:
 

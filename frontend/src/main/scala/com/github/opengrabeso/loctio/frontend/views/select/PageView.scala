@@ -123,7 +123,6 @@ class PageView(
         def seqIfElse(cond: Boolean)(value: => UdashDropdown.DefaultDropdownItem)(elseValue: => UdashDropdown.DefaultDropdownItem) = {
           if (cond) Seq(value) else Seq(elseValue)
         }
-        // TODO: decide which items to allow
         seqIfElse(ar.watch == Relation.No) {
           UdashDropdown.DefaultDropdownItem.Button(s"Request watching", () => presenter.requestWatching(ar.login))
         } {
