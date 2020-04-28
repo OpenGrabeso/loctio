@@ -9,9 +9,15 @@ Developer notes
 ---------------
 
 The application project is created in InteliJ IDEA, the project is deployed as Google App Engine.
-If you want to deploy your own build, you need to provide:
- - a list of GitHub users which can access the server
 
-Put them in a file `resources/secret.txt`, list users on the first line, separated with commas, like:
 
-    User1,User2,User3
+Setup notes
+-----------
+
+Before running the server you need to install at least one admin. 
+
+Admins are listed in the /admins folder of the Google Cloud Storage bucket, there names are used as filenames, the file
+content is ignored.
+
+Admin can then add individual users.
+

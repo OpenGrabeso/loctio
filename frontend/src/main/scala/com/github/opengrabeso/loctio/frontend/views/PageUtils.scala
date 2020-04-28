@@ -48,18 +48,12 @@ trait PageUtils extends common.Formatting with CssView {
     )}
   }
 
-  def iconButton(
-    altName: String,
-    color: Color = Color.Light,
-    active: ReadableProperty[Boolean] =  UdashBootstrap.False,
-    disabled: ReadableProperty[Boolean] =  UdashBootstrap.False
-  )(content: Modifier*): UdashButton = {
-    UdashButton(disabled = disabled, active = active, buttonStyle = color.toProperty) { _ => Seq[Modifier](
-      i(
-        content,
-        alt := altName,
-        title := altName,
-      )
+  def faIconButton(
+    name: String, buttonText: ReadableProperty[String] = "".toProperty,
+    color: Color = Color.Light, disabled: ReadableProperty[Boolean] = false.toProperty
+  ): UdashButton = {
+    UdashButton(disabled = disabled, buttonStyle = color.toProperty) { _ => Seq[Modifier](
+      i(cls := "fas fa-" + name), bind(buttonText)
     )}
   }
 }

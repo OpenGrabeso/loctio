@@ -36,17 +36,13 @@ class PageView(
   val setLocationAddr = Property[String]("")
   val setLocationLocation = Property[String]("")
   val locationOkButton = UdashButton(Color.Success.toProperty)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "OK"))
-  val addUserOkButton = UdashButton(Color.Success.toProperty)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "OK"))
 
-  val addUserLogin = Property[String]("")
-  val addUserButton = UdashButton(Color.Secondary.toProperty)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "Watch user..."))
+  val watchUserButton = UdashButton(Color.Secondary.toProperty)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "Watch user..."))
+
+  val addUserButton = UdashButton(Color.Secondary.toProperty)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "Add user..."))
 
   buttonOnClick(locationOkButton) {
     presenter.setLocationName(setLocationUser.get, setLocationLocation.get)
-  }
-
-  buttonOnClick(addUserOkButton) {
-    presenter.addUser(addUserLogin.get)
   }
 
   val setLocationModal = UdashModal(Some(Size.Small).toProperty)(
@@ -67,30 +63,47 @@ class PageView(
       ).render
     }
   )
-  val addUserModal = UdashModal(Some(Size.Small).toProperty)(
-    headerFactory = Some(_ => div("GitHub user login name").render),
-    bodyFactory = Some { nested =>
-      div(
-        Spacing.margin(),
-        Card.card, Card.body, Background.color(Color.Light),
-      )(
-        bind(setLocationAddr),
-        TextInput(addUserLogin)()
-      ).render
-    },
-    footerFactory = Some { _ =>
-      div(
-        addUserOkButton.render,
-        UdashButton(Color.Danger.toProperty)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "Cancel")).render
-      ).render
-    }
-  )
 
-  buttonOnClick(addUserButton) {
-    addUserLogin.set("")
-    addUserModal.show()
+  class EnterUser(title: String) {
+
+    val userName = Property[String]("")
+    val okButton = UdashButton(Color.Success.toProperty)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "OK"))
+
+    val modal = UdashModal(Some(Size.Small).toProperty)(
+      headerFactory = Some(_ => div(h2(title)).render),
+      bodyFactory = Some { nested =>
+        div(
+          Spacing.margin(),
+          Card.card, Card.body, Background.color(Color.Light),
+        )(
+          "GitHub user login name",
+          TextInput(userName)()
+        ).render
+      },
+      footerFactory = Some { _ =>
+        div(
+          okButton.render,
+          UdashButton(Color.Danger.toProperty)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "Cancel")).render
+        ).render
+      }
+    )
+
+    def show() = {
+      userName.set("")
+      modal.show()
+    }
   }
-  
+
+  val watchUser = new EnterUser("Watch user")
+
+  buttonOnClick(watchUserButton)(watchUser.show())
+  buttonOnClick(watchUser.okButton)(presenter.watchUser(watchUser.userName.get))
+
+  val addUser = new EnterUser("Add user")
+
+  buttonOnClick(addUserButton)(addUser.show())
+  buttonOnClick(addUser.okButton)(presenter.addUser(addUser.userName.get))
+
   private def locationRealNameOnly(s: String): String = {
     val IpAddr = "[0-9]+\\.[0-9.]+]".r
     s match {
@@ -100,6 +113,7 @@ class PageView(
         s
     }
   }
+
   def userDropDown(ar: UserRow) = {
     def callback(): Unit = {
       setLocationUser.set(ar.login)
@@ -123,7 +137,6 @@ class PageView(
         def seqIfElse(cond: Boolean)(value: => UdashDropdown.DefaultDropdownItem)(elseValue: => UdashDropdown.DefaultDropdownItem) = {
           if (cond) Seq(value) else Seq(elseValue)
         }
-        // TODO: decide which items to allow
         seqIfElse(ar.watch == Relation.No) {
           UdashDropdown.DefaultDropdownItem.Button(s"Request watching", () => presenter.requestWatching(ar.login))
         } {
@@ -139,6 +152,11 @@ class PageView(
 
     val dropdown = UdashDropdown.default(items)(_ => Seq[Modifier]("", Button.color(Color.Primary)))
     dropdown.render
+  }
+
+  def onAdminClick(): Unit = {
+    println("Clicked Admin")
+
   }
 
   def getTemplate: Modifier = {
@@ -195,8 +213,10 @@ class PageView(
               div(
                 bind(model.subProp(_.error).transform(_.map(ex => s"Error ${getErrorText(ex)}").orNull)),
                 table.render,
-                addUserButton.render,
+                watchUserButton.render,
                 showIf(usersPartial.transform(_.nonEmpty))(Seq(tablePartial.render)),
+
+                showIf(globals.subProp(_.role).transform(_ == "admin"))(Seq(" ".render, addUserButton.render))
               ).render
             )
           )
@@ -205,7 +225,8 @@ class PageView(
       div(
         s.hideModals,
         setLocationModal,
-        addUserModal
+        watchUser.modal,
+        addUser.modal
       ),
       footer
     )

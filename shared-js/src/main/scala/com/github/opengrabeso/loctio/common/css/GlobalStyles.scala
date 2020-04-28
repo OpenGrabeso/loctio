@@ -39,7 +39,7 @@ object GlobalStyles extends CssBase {
   )
 
   val footerText: CssStyle = style(
-    color.white
+    color.darkgreen
   )
   val footerLink: CssStyle = style(
     color.inherit

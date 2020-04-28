@@ -11,8 +11,9 @@ import scala.concurrent.Future
 trait UserRestAPI {
   import UserRestAPI._
 
+  // login name, full name, role
   @GET
-  def name: Future[(String, String)]
+  def name: Future[(String, String, String)]
 
   @POST
   def listUsers(ipAddress: String, state: String): Future[Seq[(String, LocationInfo)]]
@@ -26,6 +27,9 @@ trait UserRestAPI {
 
   @GET
   def trayNotificationsHTML(): Future[(String, Seq[String], Int)]
+
+  @PUT("users")
+  def addUser(userName: String): Future[Unit]
 
   @POST
   @CustomBody

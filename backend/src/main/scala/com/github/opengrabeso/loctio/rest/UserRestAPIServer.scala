@@ -56,13 +56,22 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
     addr match {
       case Valid() =>
       case _ =>
-        throw HttpErrorException(400, s"Invalid IP address $name")
+        throw HttpErrorException(400, s"Invalid IP address $addr")
     }
   }
 
+  private def isAdminSync(): Boolean = {
+    Main.checkAdminAuthorized(userAuth.login)
+  }
 
   def name = syncResponse {
-    (userAuth.login, userAuth.fullName)
+    val isAdmin = isAdminSync()
+    (userAuth.login, userAuth.fullName, if (isAdmin) "admin" else "user")
+  }
+
+  def addUser(userName: String) = syncResponse {
+    Main.authorizedAdmin(userAuth.login)
+    Storage.store(FileStore.FullName("users", userName), "user")
   }
 
   private def listUsersSync(ipAddress: String, state: String, requests: Boolean = false) = {

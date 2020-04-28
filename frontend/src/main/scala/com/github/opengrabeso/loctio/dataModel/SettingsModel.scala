@@ -3,7 +3,11 @@ package com.github.opengrabeso.loctio.dataModel
 import io.udash.HasModelPropertyCreator
 import org.scalajs.dom
 
-case class SettingsModel(token: String = "", login: String = "", fullName: String = "", state: String = "online")
+case class SettingsModel(
+  token: String = "", login: String = "", fullName: String = "",
+  role: String = "user",
+  state: String = "online"
+)
 
 object SettingsModel extends HasModelPropertyCreator[SettingsModel] {
 

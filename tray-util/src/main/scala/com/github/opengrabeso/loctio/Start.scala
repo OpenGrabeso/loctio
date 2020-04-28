@@ -158,9 +158,9 @@ object Start extends SimpleSwingApplication {
     // if already logged in, report shutdown first so that we get complete notifications
     loginName = ""
     if (token != "") { // login with token == "" means log-out
-      server.at(global).flatMap(_.api.user(token).name).at(OnSwing).map { case (s, _) =>
+      server.at(global).flatMap(_.api.user(token).name).at(OnSwing).map { case (s, _, role) =>
         loginName = s
-        println(s"Login done $s")
+        println(s"Login as $role done $s for")
         // request users regularly
         updateSchedule = system.scheduler.schedule(Duration(0, duration.MINUTES), Duration(1, duration.MINUTES)) {
           requestUsers.at(OnSwing).foreach { case (users, tooltip) =>
