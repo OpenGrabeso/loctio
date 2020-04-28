@@ -153,7 +153,7 @@ class PageView(
         "Last seen",
         (ar, _, _) => if (ar.currentState != "online" && ar.currentState != "busy" && ar.currentState != "unknown") common.UserState.smartTime(ar.lastTime, formatTime, formatDate, formatDayOfWeek).render else ""
       ),
-      TableFactory.TableAttrib("Watching me", (ar, _, _) => ar.watchingMe.toString.render),
+      TableFactory.TableAttrib("Watching me", (ar, _, _) => if (ar.login != model.subProp(_.settings.login).get) ar.watchingMe.toString.render else ""),
       TableFactory.TableAttrib("", (ar, _, _) => userDropDown(ar)),
     )
     val partialAttribs = Seq[DisplayAttrib](
