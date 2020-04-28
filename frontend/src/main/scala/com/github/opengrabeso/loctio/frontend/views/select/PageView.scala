@@ -120,13 +120,19 @@ class PageView(
       if (current) base ++ states.filter(_ != state).flatMap(s =>
         Seq(UdashDropdown.DefaultDropdownItem.Button(s"Make $s", () => presenter.changeUserState(s))),
       ) else {
-        Seq(
-          // TODO: decide which items to allow
-          UdashDropdown.DefaultDropdownItem.Button(s"Request watching", () => presenter.requestWatching(ar.login)),
-          UdashDropdown.DefaultDropdownItem.Button(s"Stop watching", () => presenter.stopWatching(ar.login)),
-          UdashDropdown.DefaultDropdownItem.Button(s"Disallow watching me", () => presenter.disallowWatchingMe(ar.login)),
-          UdashDropdown.DefaultDropdownItem.Button(s"Allow watching me", () => presenter.allowWatchingMe(ar.login)),
-        )
+        def seqIfElse(cond: Boolean)(value: => UdashDropdown.DefaultDropdownItem)(elseValue: => UdashDropdown.DefaultDropdownItem) = {
+          if (cond) Seq(value) else Seq(elseValue)
+        }
+        // TODO: decide which items to allow
+        seqIfElse(ar.watch == Relation.No) {
+          UdashDropdown.DefaultDropdownItem.Button(s"Request watching", () => presenter.requestWatching(ar.login))
+        } {
+          UdashDropdown.DefaultDropdownItem.Button(s"Stop watching", () => presenter.stopWatching(ar.login))
+        } ++ seqIfElse(ar.watchingMe == Relation.No) {
+          UdashDropdown.DefaultDropdownItem.Button(s"Allow watching me", () => presenter.allowWatchingMe(ar.login))
+        } {
+          UdashDropdown.DefaultDropdownItem.Button(s"Disallow watching me", () => presenter.disallowWatchingMe(ar.login))
+        }
 
       }
     }
@@ -158,8 +164,8 @@ class PageView(
       TableFactory.TableAttrib("", (ar, _, _) => userDropDown(ar)),
     )
 
-    val usersFull = model.subSeq(_.users).filter(_.watch == Relation.Yes)
-    val usersPartial = model.subSeq(_.users).filter(_.watch != Relation.Yes)
+    val usersFull = model.subSeq(_.users).filter(_.watch == Relation.Allowed)
+    val usersPartial = model.subSeq(_.users).filter(_.watch != Relation.Allowed)
     val table = UdashTable(usersFull, striped = true.toProperty, bordered = true.toProperty, hover = true.toProperty, small = true.toProperty)(
       headerFactory = Some(TableFactory.headerFactory(attribs)),
       rowFactory = TableFactory.rowFactory(attribs)

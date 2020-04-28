@@ -71,7 +71,7 @@ object Presence {
     }
 
     def relation(listAllowed: Seq[String], listRequested: Seq[String], user: String): Relation = {
-      if (listAllowed.contains(user)) Relation.Yes
+      if (listAllowed.contains(user)) Relation.Allowed
       else if (listRequested.contains(user)) Relation.Requested
       else Relation.No
     }
@@ -88,7 +88,7 @@ object Presence {
           val state = if (age < 70 && d.state == "offline") "online" else d.state
           //println(s"Report $login as $d")
           val watchedBy = relation(watchedByAllowed, watchedByRequested, login)
-          login -> LocationInfo(Locations.locationFromIpAddress(d.ipAddress), lastSeen, state, Relation.Yes, watchedBy)
+          login -> LocationInfo(Locations.locationFromIpAddress(d.ipAddress), lastSeen, state, Relation.Allowed, watchedBy)
         }.getOrElse(login -> LocationInfo("", now, "unknown", Relation.No, Relation.No))
       }
     if (requests) {
