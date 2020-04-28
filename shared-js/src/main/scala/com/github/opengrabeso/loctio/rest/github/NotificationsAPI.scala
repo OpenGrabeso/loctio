@@ -16,7 +16,9 @@ trait NotificationsAPI {
     @transientDefault all: Boolean = false,
     @transientDefault participating: Boolean = false,
     @transientDefault since: ZonedDateTime = null,
-    @transientDefault before: ZonedDateTime = null
+    @transientDefault before: ZonedDateTime = null,
+    @transientDefault page: Int = 0,
+    @transientDefault per_page: Int = 0,
   ): Future[DataWithHeaders[Seq[Notification]]]
 
   @PUT("")

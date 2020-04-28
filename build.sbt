@@ -145,6 +145,7 @@ lazy val backend = (project in file("backend"))
     }.taskValue,
 
     commonSettings,
+    flyingSaucersSettings,
 
     libraryDependencies ++= commonLibs ++ jvmLibs ++ Seq(
       "com.google.appengine.tools" % "appengine-gcs-client" % "0.8" exclude("javax.servlet", "servlet.api"),

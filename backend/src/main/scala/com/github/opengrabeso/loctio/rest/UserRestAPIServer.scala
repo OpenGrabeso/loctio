@@ -230,6 +230,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
       val r = gitHubAPI.api.authorized("Bearer " + userAuth.token).notifications.get(
         ifModifiedSince,
+        per_page = 20 // default 50 is too high, often leads to timeouts
         //all = true
       ).at(executeNow).transform {
         case Success(response) =>
