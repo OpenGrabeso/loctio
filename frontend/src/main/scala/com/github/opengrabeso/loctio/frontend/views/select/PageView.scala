@@ -5,7 +5,7 @@ package select
 
 import java.time.{Duration, ZonedDateTime}
 
-import common.model.UserRow
+import common.model.{Relation, UserRow}
 import common.css._
 import io.udash._
 import io.udash.bootstrap.button.UdashButton
@@ -15,6 +15,7 @@ import io.udash.bootstrap.utils.BootstrapStyles._
 import io.udash.bootstrap.table.UdashTable
 import io.udash.css._
 import io.udash.rest.raw.HttpErrorException
+import org.scalajs.dom.Node
 import scalatags.JsDom.all._
 
 class PageView(
@@ -35,9 +36,19 @@ class PageView(
   val setLocationAddr = Property[String]("")
   val setLocationLocation = Property[String]("")
   val locationOkButton = UdashButton(Color.Success.toProperty)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "OK"))
+  val addUserOkButton = UdashButton(Color.Success.toProperty)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "OK"))
+
+  val addUserLogin = Property[String]("")
+  val addUserButton = UdashButton(Color.Secondary.toProperty)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "Watch user..."))
+
   buttonOnClick(locationOkButton) {
     presenter.setLocationName(setLocationUser.get, setLocationLocation.get)
   }
+
+  buttonOnClick(addUserOkButton) {
+    presenter.addUser(addUserLogin.get)
+  }
+
   val setLocationModal = UdashModal(Some(Size.Small).toProperty)(
     headerFactory = Some(_ => div("Set location name (", bind(setLocationUser), ")").render),
     bodyFactory = Some { nested =>
@@ -56,7 +67,30 @@ class PageView(
       ).render
     }
   )
+  val addUserModal = UdashModal(Some(Size.Small).toProperty)(
+    headerFactory = Some(_ => div("GitHub user login name").render),
+    bodyFactory = Some { nested =>
+      div(
+        Spacing.margin(),
+        Card.card, Card.body, Background.color(Color.Light),
+      )(
+        bind(setLocationAddr),
+        TextInput(addUserLogin)()
+      ).render
+    },
+    footerFactory = Some { _ =>
+      div(
+        addUserOkButton.render,
+        UdashButton(Color.Danger.toProperty)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "Cancel")).render
+      ).render
+    }
+  )
 
+  buttonOnClick(addUserButton) {
+    addUserLogin.set("")
+    addUserModal.show()
+  }
+  
   private def locationRealNameOnly(s: String): String = {
     val IpAddr = "[0-9]+\\.[0-9.]+]".r
     s match {
@@ -83,9 +117,24 @@ class PageView(
         UdashDropdown.DefaultDropdownItem.Button("Name location", callback),
       )
       val states = Seq("invisible", "online", "busy")
-      if (current) base ++ states.filter(_ != state).map(s =>
-        UdashDropdown.DefaultDropdownItem.Button(s"Make $s", () => presenter.changeUserState(s)),
-      ) else base
+      if (current) base ++ states.filter(_ != state).flatMap(s =>
+        Seq(UdashDropdown.DefaultDropdownItem.Button(s"Make $s", () => presenter.changeUserState(s))),
+      ) else {
+        def seqIfElse(cond: Boolean)(value: => UdashDropdown.DefaultDropdownItem)(elseValue: => UdashDropdown.DefaultDropdownItem) = {
+          if (cond) Seq(value) else Seq(elseValue)
+        }
+        // TODO: decide which items to allow
+        seqIfElse(ar.watch == Relation.No) {
+          UdashDropdown.DefaultDropdownItem.Button(s"Request watching", () => presenter.requestWatching(ar.login))
+        } {
+          UdashDropdown.DefaultDropdownItem.Button(s"Stop watching", () => presenter.stopWatching(ar.login))
+        } ++ seqIfElse(ar.watchingMe != Relation.Allowed) {
+          UdashDropdown.DefaultDropdownItem.Button(s"Allow watching me", () => presenter.allowWatchingMe(ar.login))
+        } {
+          UdashDropdown.DefaultDropdownItem.Button(s"Disallow watching me", () => presenter.disallowWatchingMe(ar.login))
+        }
+
+      }
     }
 
     val dropdown = UdashDropdown.default(items)(_ => Seq[Modifier]("", Button.color(Color.Primary)))
@@ -102,14 +151,28 @@ class PageView(
       TableFactory.TableAttrib("Location", (ar, _, _) => ar.location.render),
       TableFactory.TableAttrib(
         "Last seen",
-        (ar, _, _) => if (ar.currentState != "online" && ar.currentState != "busy") common.UserState.smartTime(ar.lastTime, formatTime, formatDate, formatDayOfWeek).render else ""
+        (ar, _, _) => if (ar.currentState != "online" && ar.currentState != "busy" && ar.currentState != "unknown") common.UserState.smartTime(ar.lastTime, formatTime, formatDate, formatDayOfWeek).render else ""
       ),
+      TableFactory.TableAttrib("Watching me", (ar, _, _) => if (ar.login != model.subProp(_.settings.login).get) ar.watchingMe.toString.render else ""),
+      TableFactory.TableAttrib("", (ar, _, _) => userDropDown(ar)),
+    )
+    val partialAttribs = Seq[DisplayAttrib](
+      TableFactory.TableAttrib("", (ar, _, _) => Seq[Modifier](s.statusTd, getUserStatusIcon(ar.currentState).render)),
+      TableFactory.TableAttrib("User", (ar, _, _) => ar.login.render),
+      TableFactory.TableAttrib("Watch", (ar, _, _) => ar.watch.toString.render),
+      TableFactory.TableAttrib("Watching me", (ar, _, _) => ar.watchingMe.toString.render),
       TableFactory.TableAttrib("", (ar, _, _) => userDropDown(ar)),
     )
 
-    val table = UdashTable(model.subSeq(_.users), striped = true.toProperty, bordered = true.toProperty, hover = true.toProperty, small = true.toProperty)(
+    val usersFull = model.subSeq(_.users).filter(_.watch == Relation.Allowed)
+    val usersPartial = model.subSeq(_.users).filter(_.watch != Relation.Allowed)
+    val table = UdashTable(usersFull, striped = true.toProperty, bordered = true.toProperty, hover = true.toProperty, small = true.toProperty)(
       headerFactory = Some(TableFactory.headerFactory(attribs)),
       rowFactory = TableFactory.rowFactory(attribs)
+    )
+    val tablePartial = UdashTable(usersPartial, striped = true.toProperty, bordered = true.toProperty, hover = true.toProperty, small = true.toProperty)(
+      headerFactory = Some(TableFactory.headerFactory(partialAttribs)),
+      rowFactory = TableFactory.rowFactory(partialAttribs)
     )
 
     def getErrorText(ex: Throwable) = ex match {
@@ -131,7 +194,9 @@ class PageView(
               p("Loading...").render,
               div(
                 bind(model.subProp(_.error).transform(_.map(ex => s"Error ${getErrorText(ex)}").orNull)),
-                table.render
+                table.render,
+                addUserButton.render,
+                showIf(usersPartial.transform(_.nonEmpty))(Seq(tablePartial.render)),
               ).render
             )
           )
@@ -140,6 +205,7 @@ class PageView(
       div(
         s.hideModals,
         setLocationModal,
+        addUserModal
       ),
       footer
     )

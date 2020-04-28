@@ -103,6 +103,7 @@ class PagePresenter(
       //model.subProp(_.debug).set(s"Last active at $lastActive")
     })
 
+    /* web page shutdown messes with the Tray utility, it is better not to report it
     // register the shutdown handler (beacon)
     val debugBeacon = false
     def onUnload() = dom.window.navigator.asInstanceOf[js.Dynamic].sendBeacon(s"/rest/user/$token/shutdown", "now")
@@ -111,6 +112,7 @@ class PagePresenter(
     } else {
       jQ(dom.window).on("unload", (_, _) => onUnload())
     }
+    */
   }
 
   def init(): Unit = {
@@ -150,8 +152,12 @@ class PagePresenter(
   }
 
   def setLocationName(login: String, location: String): Unit = {
-    val token = currentToken
-    userAPI.setLocationName(login, location).onComplete(loadUsersCallback(token, _))
+    userAPI.setLocationName(login, location).onComplete(loadUsersCallback(currentToken, _))
+  }
+
+  def addUser(user: String): Unit = {
+    // when we add a user, it is because we want to watch them
+    userAPI.requestWatching(user).onComplete(loadUsersCallback(currentToken, _))
   }
 
   def changeUserState(s: String): Unit = {
@@ -160,6 +166,20 @@ class PagePresenter(
     refreshUsers()
   }
 
+  def requestWatching(login: String) = {
+    userAPI.requestWatching(login).onComplete(loadUsersCallback(currentToken, _))
+  }
+
+  def stopWatching(login: String) = {
+    userAPI.stopWatching(login).onComplete(loadUsersCallback(currentToken, _))
+  }
+  def allowWatchingMe(login: String) = {
+    userAPI.allowWatchingMe(login).onComplete(loadUsersCallback(currentToken, _))
+  }
+
+  def disallowWatchingMe(login: String) = {
+    userAPI.disallowWatchingMe(login).onComplete(loadUsersCallback(currentToken, _))
+  }
 
   override def handleState(state: SelectPageState.type): Unit = {}
 }
