@@ -128,7 +128,7 @@ class PageView(
           UdashDropdown.DefaultDropdownItem.Button(s"Request watching", () => presenter.requestWatching(ar.login))
         } {
           UdashDropdown.DefaultDropdownItem.Button(s"Stop watching", () => presenter.stopWatching(ar.login))
-        } ++ seqIfElse(ar.watchingMe == Relation.No) {
+        } ++ seqIfElse(ar.watchingMe != Relation.Allowed) {
           UdashDropdown.DefaultDropdownItem.Button(s"Allow watching me", () => presenter.allowWatchingMe(ar.login))
         } {
           UdashDropdown.DefaultDropdownItem.Button(s"Disallow watching me", () => presenter.disallowWatchingMe(ar.login))
