@@ -296,7 +296,8 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                 } else Seq(issueData)
 
                 n.subject.url -> commentData.map { case (linkUrl, linkText, by, time, body) =>
-                  val markdown = gitHubAPI.api.authorized("Bearer " + userAuth.token).markdown.markdown(body).awaitNow
+                  val context = n.repository.full_name
+                  val markdown = gitHubAPI.api.authorized("Bearer " + userAuth.token).markdown.markdown(body, mode = "gfm", context = context).awaitNow
                   CommentContent(
                       linkUrl,
                       linkText,
@@ -331,25 +332,25 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
             //language=HTML
             val comment = comments.get(n.subject.url)
             val header = s"""
-            <tr><td class="notification header">
+            <div class="notification header">
 
               <span class="message title">${n.subject.title}</span><br/>
               ${n.repository.full_name}
               <span class="message time"><time>${n.updated_at}</time></span>
               <span class="message reason ${n.reason}">${n.reason}</span>
-             </td></tr>
+             </div>
              """
             comments.get(n.subject.url).map { cs =>
               header + cs.map( c=>
                 s"""
-                 <tr><td class="notification signature">
+                 <div class="notification signature">
                   <span class="message link">
                   <a href="${c.linkUrl}">${c.linkText}</a>
                   </span>
                  <span class="message by">${c.author}</span>
                  <span class="message time"><time>${c.time}</time></span>
-                 </td></tr>
-                 <tr><td class="notification body article-content">${c.html}</td></tr>
+                 </div>
+                 <div class="notification body article-content">${c.html}</div>
                  """
               ).mkString("\n")
             }.getOrElse(header)
@@ -364,9 +365,9 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               </head>
               <body class="notifications">
                 <p><a href="https://www.github.com/notifications">GitHub notifications</a></p>
-                <table>
-                ${unread.map(notificationHTML(_, comments)).mkString}
-                </table>
+                <div class="notification table">
+                ${unread.map("<div class='notification item'>" + notificationHTML(_, comments) + "</div>").mkString}
+                </div>
               </body>
              </html>
           """

@@ -48,9 +48,6 @@ object IssueStyles extends CssBase  {
           padding(6 px, 13 px),
           border(1 px, solid, c"#dfe2e5"),
         ),
-        unsafeChild("tr:nth-child(2n)") (
-          backgroundColor(c"#f6f8fa"),
-        )
       ),
       unsafeChild(".lh-condensed") (
         lineHeight(1.25).important

@@ -67,13 +67,26 @@ assign, author, comment, invitation, manual, mention, review_requested, security
 
 .notification.header {
     background-color: #e6eaf5;
+    border: 1px solid #e0e0e0;
 }
 
 .notification.body {
-
+    border: 1px solid #e0e0e0;
+    background-color: white;
 }
 
+.notification.body pre {
+    overflow: hidden !important;
+}
+
+.notification.body .blob-code-inner {
+    overflow: hidden !important;
+    white-space: pre-wrap !important;
+}
+
+
 .notification.signature {
+    border: 1px solid #e0e0e0;
     background-color: #fffff5;
 }
 
