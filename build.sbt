@@ -2,16 +2,17 @@ import sbt.Keys.scalacOptions
 // shadow sbt-scalajs' crossProject and CrossType from Scala.js 0.6.x
 import sbtcrossproject.CrossPlugin.autoImport.{crossProject, CrossType}
 
-githubTokenSource in ThisBuild := TokenSource.GitConfig("github.token") || TokenSource.Environment("BUILD_USERTOKEN") || TokenSource.Environment("GITHUB_TOKEN")
-
-resolvers in ThisBuild += Resolver.githubPackages("OpenGrabeso")
+lazy val resolverSettings = Seq(
+  githubTokenSource := TokenSource.GitConfig("github.token") || TokenSource.Environment("BUILD_TOKEN") || TokenSource.Environment("GITHUB_TOKEN"),
+  resolvers += Resolver.githubPackages("OpenGrabeso")
+)
 
 lazy val commonSettings = Seq(
   organization := "com.github.opengrabeso",
   version := "0.4.1-beta",
   scalaVersion := "2.12.10",
-  scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature")
-)
+  scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature"),
+) ++ resolverSettings
 
 lazy val jsCommonSettings = Seq(
   scalacOptions ++= Seq("-P:scalajs:sjsDefinedByDefault")
@@ -173,9 +174,11 @@ lazy val jetty = (project in file("jetty")).dependsOn(backend).settings(
   libraryDependencies ++= Seq(
     // "javax.servlet" % "javax.servlet-api" % "4.0.1", // version 3.1.0 provided by the jetty-server should be fine
     "org.eclipse.jetty" % "jetty-server" % "9.3.18.v20170406"
-  )
+  ),
+  resolverSettings
 )
 
 lazy val root = (project in file(".")).aggregate(backend).settings(
-  name := "Loctio"
+  name := "Loctio",
+  resolverSettings
 )

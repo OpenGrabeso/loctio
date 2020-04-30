@@ -16,10 +16,10 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Run tests
         run: |
-          printf "realm=github\nhost=www.github.com\nuser=${{ secrets.BUILD_USERNAME }}\password=${{ secrets.BUILD_USERTOKEN }}" > ~/gihub.credentials
-          printf "[github]\n  actor=${{ secrets.BUILD_USERNAME }}\n  token=${{ secrets.BUILD_USERTOKEN }}" > ~/.gitconfig
+          printf "realm=github\nhost=www.github.com\nuser=${{ secrets.BUILD_USERNAME }}\password=${{ secrets.BUILD_TOKEN }}" > ~/gihub.credentials
+          printf "[github]\n  actor=${{ secrets.BUILD_USERNAME }}\n  token=${{ secrets.BUILD_TOKEN }}" > ~/.gitconfig
           sbt backend/test trayUtil/test backend/products jetty/compile
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUILD_USERNAME: ${{ secrets.BUILD_USERNAME }}
-          BUILD_USERTOKEN: ${{ secrets.BUILD_USERTOKEN }}
+          BUILD_TOKEN: ${{ secrets.BUILD_TOKEN }}
