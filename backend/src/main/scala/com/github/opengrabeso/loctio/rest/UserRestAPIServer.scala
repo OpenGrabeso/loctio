@@ -307,8 +307,8 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               }
             case n if n.subject.`type` == "Release" =>
               import rest.github.EnhancedRestImplicits._
-              val releaseResponse = Try(gitHubAPI.request[Release](n.subject.url, userAuth.token).awaitNow).toOption
-              for (release <- releaseResponse) yield {
+              val response = Try(gitHubAPI.request[Release](n.subject.url, userAuth.token).awaitNow).toOption
+              for (release <- response) yield {
                 n.subject.url -> Seq(CommentContent(
                   release.html_url,
                   s"${release.tag_name}",
@@ -319,6 +319,18 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               }
             case n if n.subject.`type` == "CheckSuite" =>
               None
+            case n if n.subject.`type` == "Commit" =>
+              import rest.github.EnhancedRestImplicits._
+              val response = Try(gitHubAPI.request[Commit](n.subject.url, userAuth.token).awaitNow).toOption
+              for (release <- response) yield {
+                n.subject.url -> Seq(CommentContent(
+                  release.html_url,
+                  s"${release.sha}",
+                  "",
+                  release.author.login,
+                  n.updated_at
+                ))
+              }
             case _ =>
               None
           }
