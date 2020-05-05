@@ -240,6 +240,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
     }
   }
 
+
   def trayNotificationsHTML() = syncResponse {
     val sttpBackend = new SttpBackendAsyncWrapper(HttpURLConnectionBackend())(executeNow)
     try {
@@ -291,7 +292,6 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
             s"#${issue.number}"
           }
 
-
           def buildNotificationHeader(n: common.model.github.Notification, prefix: String = ""): String = {
             //language=HTML
             s"""
@@ -305,7 +305,18 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           }
 
           def buildIssueNotificationHeader(n: common.model.github.Notification, i: Issue): String = {
-            val issueLink = s"""<a href="${issueUrl(n, i)}">${issueTitle(i)}</a> """
+
+            def issueStateIcon(iconName: String, style: String): String = {
+              Octicons.loadIcon(iconName)
+            }
+
+            val icon = i.state match {
+              case "closed" => issueStateIcon("issue-closed", "closed")
+              case "open" => issueStateIcon("issue-opened", "open")
+              case _ => ""
+            }
+
+            val issueLink = s"""$icon<a href="${issueUrl(n, i)}">${issueTitle(i)}</a> """
             buildNotificationHeader(n, issueLink)
           }
 
