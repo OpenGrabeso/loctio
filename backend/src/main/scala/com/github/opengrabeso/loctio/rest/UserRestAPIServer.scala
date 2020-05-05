@@ -32,9 +32,7 @@ object UserRestAPIServer {
     override def htmlResult =
       s"""
       <div class="notification signature">
-      <span class="message link">
-      <a href="$linkUrl">$linkText</a>
-      </span>
+      <span class="message link"> <a href="$linkUrl">$linkText</a> </span>
       <span class="message by">$author</span>
       <span class="message time"><time>$time</time></span>
       </div>
@@ -43,12 +41,29 @@ object UserRestAPIServer {
 
   }
 
+  case class EventContent(
+    linkUrl: String,
+    linkText: String,
+    event: String,
+    author: String,
+    time: ZonedDateTime
+  ) extends NotificationContent {
+    override def htmlResult =
+      s"""
+      <div class="notification signature">
+      <span class="message link"> <a href="$linkUrl">$linkText</a> </span>
+      <span class="message by">$author</span>
+      $event this at <span class="message time"><time>$time</time></span>
+      </div>
+      """
+  }
+
   case class TraySession(
     sessionStarted: ZonedDateTime, // used to decide when should be flush (reset) the session to perform a full update
     lastModified: Option[String], // lastModified HTTP headers used for notifications optimization
     lastPoll: ZonedDateTime, // last time when the user has polled notifications
     currentMesages: Seq[Notification],
-    lastComments: Map[String, Seq[CommentContent]], // we use URL for identification, as this is sure to be stable for an issue
+    lastComments: Map[String, Seq[NotificationContent]], // we use URL for identification, as this is sure to be stable for an issue
     mostRecentNotified: Option[ZonedDateTime] // most recent notification display to the user
   )
 
@@ -299,7 +314,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                   cs.zipWithIndex.map { case (c, index) => buildCommentData(c, cs.size - index) }
                 }
                 def buildEventData(c: Event) = {
-                  CommentContent(
+                  EventContent(
                     prefix,
                     s"#${issue.number}",
                     c.event, c.actor.login, c.created_at
@@ -399,7 +414,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           val comments = recentSession.map(_.lastComments.filterKeys(unreadIds.contains).map(identity)).getOrElse(Map.empty) ++ newComments
 
           // response content seems inconsistent. Sometimes it contains messages
-          def notificationHTML(n: common.model.github.Notification, comments: Map[String, Seq[CommentContent]]) = {
+          def notificationHTML(n: common.model.github.Notification, comments: Map[String, Seq[NotificationContent]]) = {
             //language=HTML
             val comment = comments.get(n.subject.url)
             val header = s"""
