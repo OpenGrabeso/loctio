@@ -29,6 +29,13 @@ trait IssuesAPI {
     @transientDefault per_page: Int = 0,
   ): Future[DataWithHeaders[Seq[Comment]]]
 
+  @GET
+  def events(
+    @transientDefault since: ZonedDateTime = null,
+    @transientDefault page: Int = 0,
+    @transientDefault per_page: Int = 0,
+  ): Future[DataWithHeaders[Seq[Event]]]
+
   @POST("comments")
   def createComment(body: String): Future[Comment]
 }
