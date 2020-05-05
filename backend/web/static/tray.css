@@ -95,6 +95,10 @@ assign, author, comment, invitation, manual, mention, review_requested, security
     width: 16px
 }
 
+.issue-state-icon {
+    vertical-align: middle;
+}
+
 
 .username a:link {
     text-decoration: none;

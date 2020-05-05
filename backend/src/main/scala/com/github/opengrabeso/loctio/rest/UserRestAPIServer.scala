@@ -307,7 +307,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           def buildIssueNotificationHeader(n: common.model.github.Notification, i: Issue): String = {
 
             def issueStateIcon(iconName: String, style: String): String = {
-              s"""<b>$style</b>"""
+              s"""<img class="issue-state-icon" src="/static/small/$iconName.png"></img>"""
             }
 
             val icon = i.state match {
