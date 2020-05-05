@@ -283,16 +283,30 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           println(s"${userAuth.login}: since $ifModifiedSince new: ${newUnread.size}, read: ${read.size}, unread: ${unread.size}")
           // download last comments for the new content
 
-          def buildNotificationHeader(n: common.model.github.Notification): String = {
+          def issueUrl(n: Notification, issue: Issue): String = {
+            s"https://www.github.com/${n.repository.full_name}/issues/${issue.number}"
+          }
+
+          def issueTitle(issue: Issue): String = {
+            s"#${issue.number}"
+          }
+
+
+          def buildNotificationHeader(n: common.model.github.Notification, prefix: String = ""): String = {
             //language=HTML
             s"""
             <div class="notification header">
-              <span class="message title">${n.subject.title}</span><br/>
+              $prefix<span class="message title">${n.subject.title}</span><br/>
               ${n.repository.full_name}
               <span class="message time"><time>${n.updated_at}</time></span>
               <span class="message reason ${n.reason}">${n.reason}</span>
              </div>
              """
+          }
+
+          def buildIssueNotificationHeader(n: common.model.github.Notification, i: Issue): String = {
+            val issueLink = s"""<a href="${issueUrl(n, i)}">${issueTitle(i)}</a> """
+            buildNotificationHeader(n, issueLink)
           }
 
           val newComments = newUnread.flatMap {
@@ -307,7 +321,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                 println(s"issue ${n.repository.full_name} ${issue.number}")
                 // n.subject.latest_comment_url is sometimes the same as n.subject.url even if some comments exist
                 // this happens e.g. with a state change (issue closed)
-                val prefix = s"https://www.github.com/${n.repository.full_name}/issues/${issue.number}"
+                val prefix = issueUrl(n, issue)
 
                 def buildCommentContent(linkUrl: String, linkText: String, by: String, time: ZonedDateTime, body: String) = {
                   val context = n.repository.full_name
@@ -319,7 +333,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                   )
                 }
 
-                def issueData = buildCommentContent(prefix, s"#${issue.number}", issue.user.login, issue.updated_at, issue.body)
+                def issueData = buildCommentContent(prefix, issueTitle(issue), issue.user.login, issue.updated_at, issue.body)
 
                 def buildCommentData(c: Comment, relIndex: Int) = {
                   buildCommentContent(s"$prefix#issuecomment-${c.id}", s"#${issue.number}(-$relIndex)", c.user.login, c.updated_at, c.body)
@@ -330,7 +344,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                 def buildEventData(c: Event) = {
                   EventContent(
                     prefix,
-                    s"#${issue.number}",
+                    issueTitle(issue),
                     c.event, c.actor.login, c.created_at
                   )
                 }
@@ -394,7 +408,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                 (
                   n.subject.url,
                   commentData,
-                  None
+                  Some(buildIssueNotificationHeader(n, issue))
                 )
 
               }
