@@ -19,20 +19,51 @@ import shared.ChainingSyntax._
 import common.Util._
 
 object UserRestAPIServer {
+  trait NotificationContent {
+    def htmlResult: String
+  }
   case class CommentContent(
     linkUrl: String,
     linkText: String,
     html: String,
     author: String,
     time: ZonedDateTime
-  )
+  ) extends NotificationContent {
+    override def htmlResult =
+      s"""
+      <div class="notification signature">
+      <span class="message link"> <a href="$linkUrl">$linkText</a> </span>
+      <span class="message by">$author</span>
+      <span class="message time"><time>$time</time></span>
+      </div>
+      <div class="notification body article-content">$html</div>
+      """
+
+  }
+
+  case class EventContent(
+    linkUrl: String,
+    linkText: String,
+    event: String,
+    author: String,
+    time: ZonedDateTime
+  ) extends NotificationContent {
+    override def htmlResult =
+      s"""
+      <div class="notification signature">
+      <span class="message link"> <a href="$linkUrl">$linkText</a> </span>
+      <span class="message by">$author</span>
+      $event this at <span class="message time"><time>$time</time></span>
+      </div>
+      """
+  }
 
   case class TraySession(
     sessionStarted: ZonedDateTime, // used to decide when should be flush (reset) the session to perform a full update
     lastModified: Option[String], // lastModified HTTP headers used for notifications optimization
     lastPoll: ZonedDateTime, // last time when the user has polled notifications
     currentMesages: Seq[Notification],
-    lastComments: Map[String, Seq[CommentContent]], // we use URL for identification, as this is sure to be stable for an issue
+    lastComments: Map[String, Seq[NotificationContent]], // we use URL for identification, as this is sure to be stable for an issue
     mostRecentNotified: Option[ZonedDateTime] // most recent notification display to the user
   )
 
@@ -260,11 +291,45 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               //val since = response.headers.lastModified.map(ZonedDateTime.parse(_, DateTimeFormatter.RFC_1123_DATE_TIME))
               for (issue <- issueResponse) yield {
                 println(s"issue ${n.repository.full_name} ${issue.number}")
-                // do not try getting comments when the latest_comment_url says there are none
-                val comments = if (n.subject.latest_comment_url != n.subject.url) Try {
-                  val commentsSince = gitHubAPI.api.authorized("Bearer " + userAuth.token)
+                // n.subject.latest_comment_url is sometimes the same as n.subject.url even if some comments exist
+                // this happens e.g. with a state change (issue closed)
+                val prefix = s"https://www.github.com/${n.repository.full_name}/issues/${issue.number}"
+
+                def buildCommentContent(linkUrl: String, linkText: String, by: String, time: ZonedDateTime, body: String) = {
+                  val context = n.repository.full_name
+                  val markdown = gitHubAPI.api.authorized("Bearer " + userAuth.token).markdown.markdown(body, mode = "gfm", context = context).awaitNow
+                  CommentContent(
+                    linkUrl,
+                    linkText,
+                    HTMLUtils.xhtml(markdown.data), by, time
+                  )
+                }
+
+                def issueData = buildCommentContent(prefix, s"#${issue.number}", issue.user.login, issue.updated_at, issue.body)
+
+                def buildCommentData(c: Comment, relIndex: Int) = {
+                  buildCommentContent(s"$prefix#issuecomment-${c.id}", s"#${issue.number}(-$relIndex)", c.user.login, c.updated_at, c.body)
+                }
+                def buildCommentDataSeq(cs: Seq[Comment]) = {
+                  cs.zipWithIndex.map { case (c, index) => buildCommentData(c, cs.size - index) }
+                }
+                def buildEventData(c: Event) = {
+                  EventContent(
+                    prefix,
+                    s"#${issue.number}",
+                    c.event, c.actor.login, c.created_at
+                  )
+                }
+                def buildEventDataSeq(es: Seq[Event]) = {
+                  es.map(buildEventData)
+                }
+
+                val comments = Try {
+
+                  val issuesAPI = gitHubAPI.api.authorized("Bearer " + userAuth.token)
                     .repos(n.repository.owner.login, n.repository.name)
                     .issuesAPI(issue.number)
+                  val commentsSince = issuesAPI
                     .comments(since = n.last_read_at)
                     .awaitNow
                     .data
@@ -276,34 +341,43 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                     .reverse
                   //println(s"commentsAfterMyAnswer ${commentsAfterMyAnswer.map(_.body).mkString("\n")}")
 
-                  // if nothing is obtained this way, use the latest_comment_url
                   if (commentsAfterMyAnswer.isEmpty) {
-                    Seq(gitHubAPI.request[Comment](n.subject.latest_comment_url, userAuth.token).awaitNow)
-                  } else commentsAfterMyAnswer
+                    // if nothing is obtained this way, use the last comment
+                    // if the last comment is the issue itself and the reason is a state change
+                    // it means nothing was posted and we should display the state change itself
 
-                }.toOption.toSeq.flatten else Seq.empty
+                    // a reasonable alternative could be to show no body at all in such situation
+                    def fromLastCommentUrl = gitHubAPI.request[Comment](n.subject.latest_comment_url, userAuth.token).awaitNow
+                    if (commentsSince.nonEmpty) buildCommentDataSeq(Seq(commentsSince.last))
+                    else if (n.subject.latest_comment_url != n.subject.url) buildCommentDataSeq(Seq(fromLastCommentUrl))
+                    else {
+                      // try issue events first
+                      val eventsSince = Try(issuesAPI.events(since = n.last_read_at).awaitNow).toOption.toSeq.flatMap(_.data)
+                      if (eventsSince.nonEmpty) {
+                        buildEventDataSeq(eventsSince)
+                      } else {
+                        // desperate fallback - obtain the very last comment for the issue, may require two more API calls
+                        val comments = Try(issuesAPI.comments().awaitNow).toOption
+                        val lastComment = comments.map { cs =>
+                          cs.headers.paging.get("last").map { last =>
+                            gitHubAPI.request[Seq[Comment]](last, userAuth.token).awaitNow.last
+                          }.getOrElse(cs.data.last)
+                        }.getOrElse(fromLastCommentUrl)
+                        buildCommentDataSeq(Seq(lastComment))
+                      }
+                    }
+                  } else buildCommentDataSeq(commentsAfterMyAnswer)
 
-                val prefix = s"https://www.github.com/${n.repository.full_name}/issues/${issue.number}"
-                def issueData = (prefix, s"#${issue.number}", issue.user.login, issue.updated_at, issue.body)
+                }.toOption.toSeq.flatten
 
                 val commentData = if (comments.nonEmpty) {
                   val showIssue = if ((n.last_read_at == null || issue.created_at >= n.last_read_at) && issue.user.login != userAuth.login) {
                     Seq(issueData)
                   } else Seq.empty
-                  showIssue ++ comments.zipWithIndex.map { case (c, index) =>
-                    (s"$prefix#issuecomment-${c.id}", s"#${issue.number}(-${comments.size-index})", c.user.login, c.updated_at, c.body)
-                  }
+                  showIssue ++ comments
                 } else Seq(issueData)
 
-                n.subject.url -> commentData.map { case (linkUrl, linkText, by, time, body) =>
-                  val context = n.repository.full_name
-                  val markdown = gitHubAPI.api.authorized("Bearer " + userAuth.token).markdown.markdown(body, mode = "gfm", context = context).awaitNow
-                  CommentContent(
-                      linkUrl,
-                      linkText,
-                      HTMLUtils.xhtml(markdown.data), by, time
-                  )
-                }
+                n.subject.url -> commentData
               }
             case n if n.subject.`type` == "Release" =>
               import rest.github.EnhancedRestImplicits._
@@ -340,7 +414,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           val comments = recentSession.map(_.lastComments.filterKeys(unreadIds.contains).map(identity)).getOrElse(Map.empty) ++ newComments
 
           // response content seems inconsistent. Sometimes it contains messages
-          def notificationHTML(n: common.model.github.Notification, comments: Map[String, Seq[CommentContent]]) = {
+          def notificationHTML(n: common.model.github.Notification, comments: Map[String, Seq[NotificationContent]]) = {
             //language=HTML
             val comment = comments.get(n.subject.url)
             val header = s"""
@@ -353,18 +427,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
              </div>
              """
             comments.get(n.subject.url).map { cs =>
-              header + cs.map( c=>
-                s"""
-                 <div class="notification signature">
-                  <span class="message link">
-                  <a href="${c.linkUrl}">${c.linkText}</a>
-                  </span>
-                 <span class="message by">${c.author}</span>
-                 <span class="message time"><time>${c.time}</time></span>
-                 </div>
-                 <div class="notification body article-content">${c.html}</div>
-                 """
-              ).mkString("\n")
+              header + cs.map(_.htmlResult).mkString("\n")
             }.getOrElse(header)
           }
 
@@ -382,7 +445,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                 </div>
               </body>
              </html>
-          """
+            """
 
           // is it really sorted by updated_at, or some other (internal) update timestamp (e.g. when last_read_at is higher than updated_at?)
           val mostRecentNofified = recentSession.flatMap(_.mostRecentNotified)
