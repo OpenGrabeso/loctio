@@ -64,6 +64,7 @@ object UserRestAPIServer {
     lastPoll: ZonedDateTime, // last time when the user has polled notifications
     currentMesages: Seq[Notification],
     lastComments: Map[String, Seq[NotificationContent]], // we use URL for identification, as this is sure to be stable for an issue
+    info: Map[String, String], // HTML used to display the info
     mostRecentNotified: Option[ZonedDateTime] // most recent notification display to the user
   )
 
@@ -281,6 +282,19 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
           println(s"${userAuth.login}: since $ifModifiedSince new: ${newUnread.size}, read: ${read.size}, unread: ${unread.size}")
           // download last comments for the new content
+
+          def buildNotificationHeader(n: common.model.github.Notification): String = {
+            //language=HTML
+            s"""
+            <div class="notification header">
+              <span class="message title">${n.subject.title}</span><br/>
+              ${n.repository.full_name}
+              <span class="message time"><time>${n.updated_at}</time></span>
+              <span class="message reason ${n.reason}">${n.reason}</span>
+             </div>
+             """
+          }
+
           val newComments = newUnread.flatMap {
             case n if n.subject.`type` == "Issue" =>
               // the issue may have no comments
@@ -377,33 +391,44 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                   showIssue ++ comments
                 } else Seq(issueData)
 
-                n.subject.url -> commentData
+                (
+                  n.subject.url,
+                  commentData,
+                  None
+                )
+
               }
             case n if n.subject.`type` == "Release" =>
               import rest.github.EnhancedRestImplicits._
               val response = Try(gitHubAPI.request[Release](n.subject.url, userAuth.token).awaitNow).toOption
-              for (release <- response) yield {
-                n.subject.url -> Seq(CommentContent(
+              for (release <- response) yield (
+                n.subject.url,
+                Seq(CommentContent(
                   release.html_url,
                   s"${release.tag_name}",
                   release.body,
                   release.author.login,
                   release.published_at
-                ))
-              }
+                )),
+                None
+              )
             case n if n.subject.`type` == "CheckSuite" =>
               None
             case n if n.subject.`type` == "Commit" =>
               import rest.github.EnhancedRestImplicits._
               val response = Try(gitHubAPI.request[Commit](n.subject.url, userAuth.token).awaitNow).toOption
               for (release <- response) yield {
-                n.subject.url -> Seq(CommentContent(
-                  release.html_url,
-                  s"${release.sha}",
-                  "",
-                  release.author.login,
-                  n.updated_at
-                ))
+                (
+                  n.subject.url,
+                  Seq(CommentContent(
+                    release.html_url,
+                    s"${release.sha}",
+                    "",
+                    release.author.login,
+                    n.updated_at
+                  )),
+                  None
+                )
               }
             case _ =>
               None
@@ -411,21 +436,11 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
           // remove comments for the messages we no longer display
           // map(identity) is a workaround for https://github.com/scala/bug/issues/6654
-          val comments = recentSession.map(_.lastComments.filterKeys(unreadIds.contains).map(identity)).getOrElse(Map.empty) ++ newComments
+          val comments = recentSession.map(_.lastComments.filterKeys(unreadIds.contains).map(identity)).getOrElse(Map.empty) ++ newComments.map(c => c._1 -> c._2)
+          val infos = recentSession.map(_.info.filterKeys(unreadIds.contains).map(identity)).getOrElse(Map.empty) ++ newComments.flatMap(c => c._3.map(c3 => c._1 -> c3))
 
-          // response content seems inconsistent. Sometimes it contains messages
-          def notificationHTML(n: common.model.github.Notification, comments: Map[String, Seq[NotificationContent]]) = {
-            //language=HTML
-            val comment = comments.get(n.subject.url)
-            val header = s"""
-            <div class="notification header">
-
-              <span class="message title">${n.subject.title}</span><br/>
-              ${n.repository.full_name}
-              <span class="message time"><time>${n.updated_at}</time></span>
-              <span class="message reason ${n.reason}">${n.reason}</span>
-             </div>
-             """
+          def notificationHTML(n: common.model.github.Notification, comments: Map[String, Seq[NotificationContent]], infos: Map[String, String]) = {
+            val header = infos.getOrElse(n.subject.url, buildNotificationHeader(n))
             comments.get(n.subject.url).map { cs =>
               header + cs.map(_.htmlResult).mkString("\n")
             }.getOrElse(header)
@@ -441,7 +456,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               <body class="notifications">
                 <p><a href="https://www.github.com/notifications">GitHub notifications</a></p>
                 <div class="notification table">
-                ${unread.map("<div class='notification item'>" + notificationHTML(_, comments) + "</div>").mkString}
+                ${unread.map("<div class='notification item'>" + notificationHTML(_, comments, infos) + "</div>").mkString}
                 </div>
               </body>
              </html>
@@ -471,6 +486,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
             now,
             unread,
             comments,
+            infos,
             newMostRecentNotified
           )
           Storage.store(sessionFilename, newSession)
