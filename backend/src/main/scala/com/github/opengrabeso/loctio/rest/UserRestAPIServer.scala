@@ -448,12 +448,12 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
             """
 
           // is it really sorted by updated_at, or some other (internal) update timestamp (e.g. when last_read_at is higher than updated_at?)
-          val mostRecentNofified = recentSession.flatMap(_.mostRecentNotified)
+          val mostRecentNotified = recentSession.flatMap(_.mostRecentNotified)
           val newMostRecentNotified = unread.headOption.map(_.updated_at)
           // avoid flooding the notification area in case the user has many notifications
           // reverse to display oldest first
           import common.Util._
-          val notifyUserAbout = mostRecentNofified.map { notifyFrom =>
+          val notifyUserAbout = mostRecentNotified.map { notifyFrom =>
             // check newUnread only - old unread were already reported if necessary
             newUnread.filter(_.updated_at > notifyFrom).tap { u =>
               println(s"Take notified from $notifyFrom: ${u.size}, unread times: ${newUnread.map(_.updated_at)}")
