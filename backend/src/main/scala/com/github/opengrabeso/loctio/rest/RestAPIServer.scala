@@ -18,7 +18,7 @@ object RestAPIServer extends RestAPI with RestAPIUtils {
     auth
   }
 
-  def user(token: String): UserRestAPI = {
+  def user(token: String): UserRestAPIServer = {
     // TODO: check token revocation
     val logging = false
     if (logging) println(s"Try userAPI for token $token")

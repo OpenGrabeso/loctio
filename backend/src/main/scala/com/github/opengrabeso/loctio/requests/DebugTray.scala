@@ -1,23 +1,28 @@
 package com.github.opengrabeso.loctio
 package requests
 
+import com.github.opengrabeso.loctio.common.FileStore
 import spark.{Request, Response}
+
+import scala.reflect.ClassTag
 
 object DebugTray extends DefineRequest("/debug-tray") {
   def html(request: Request, resp: Response) = {
-    xml.Unparsed(
-      s"""
-      <html>
-        <head>
-          <meta charset="utf-8"/>
-          <link rel="icon" href="static/favicon.ico"/>
-          <title>${appName} - Tray HTML Debugging</title>
-        </head>
-        <body>
-        </body>
-      </html>
-      """
-    )
+    val token = request.queryParams("token")
+    object dummyStorage extends common.FileStore {
+      case class FileItem(name: String)
+
+      def itemModified(fileItem: dummyStorage.FileItem) = None
+      def listAllItems() = Seq.empty
+      def deleteItem(item: dummyStorage.FileItem) = ()
+      def store(name: FileStore.FullName, obj: AnyRef, metadata: (String, String)*) = ()
+      def load[T: ClassTag](name: FileStore.FullName) = None
+      def metadata(name: FileStore.FullName) = Seq.empty
+      def updateMetadata(item: FileStore.FullName, metadata: Seq[(String, String)]) = false
+      def itemName(item: dummyStorage.FileItem) = item.name
+    }
+    val html =  rest.RestAPIServer.user(token).trayNotificationsHTMLImpl(dummyStorage)._1
+    xml.Unparsed(html)
   }
 
 }

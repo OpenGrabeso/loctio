@@ -242,12 +242,16 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
 
   def trayNotificationsHTML() = syncResponse {
+    trayNotificationsHTMLImpl(Storage)
+  }
+
+  def trayNotificationsHTMLImpl(storage: common.FileStore) = {
     val sttpBackend = new SttpBackendAsyncWrapper(HttpURLConnectionBackend())(executeNow)
     try {
 
       val gitHubAPI = new GitHubAPIClient(sttpBackend)
 
-      val session = Storage.load[TraySession](sessionFilename)
+      val session = storage.load[TraySession](sessionFilename)
       val now = ZonedDateTime.now()
 
       // heuristics to handle missing shutdown
@@ -514,7 +518,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
             infos,
             newMostRecentNotified
           )
-          Storage.store(sessionFilename, newSession)
+          storage.store(sessionFilename, newSession)
 
           val nextAfter = response.headers.xPollInterval.map(_.toInt).getOrElse(60)
           Success(notificationsTable, notifyUser, nextAfter)
@@ -522,7 +526,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           val nextAfter = headers.xPollInterval.map(_.toInt).getOrElse(60)
 
           for (s <- recentSession) { // update the session info to keep alive (prevent resetting)
-            Storage.store(sessionFilename, s.copy(lastPoll = now))
+            storage.store(sessionFilename, s.copy(lastPoll = now))
           }
 
           Success("", Seq.empty, nextAfter)
