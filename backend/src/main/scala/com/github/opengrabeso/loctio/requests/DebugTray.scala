@@ -22,7 +22,19 @@ object DebugTray extends DefineRequest("/debug-tray") {
       def itemName(item: dummyStorage.FileItem) = item.name
     }
     val html =  rest.RestAPIServer.user(token).trayNotificationsHTMLImpl(dummyStorage)._1
-    xml.Unparsed(html)
+
+
+    xml.Unparsed(
+      // modify the head / body so that the web page debugging is more useful
+      html
+        .replace("</head>",
+          s"""
+             <title>$appName - HTML Debugging</title>
+             <link href="static/debug.css" rel="stylesheet"/>
+             </head>
+             """
+        )
+    )
   }
 
 }
