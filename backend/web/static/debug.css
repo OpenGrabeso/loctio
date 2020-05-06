@@ -1,0 +1,11 @@
+body {
+
+}
+
+body div.notification.table {
+    resize: horizontal;
+    overflow: auto;
+    width: 300px;
+    max-width: 800px;
+    min-width: 100px;
+}
