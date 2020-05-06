@@ -4,9 +4,6 @@ package requests
 import spark.{Request, Response}
 
 object UdashApp  extends DefineRequest("/app") {
-  /*
-  sessionId is a time when the initial session page was rendered on the server. A new page will constitute a new session.
-  */
   def html(request: Request, resp: Response) = {
     <html>
       <head>

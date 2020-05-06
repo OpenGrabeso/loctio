@@ -33,10 +33,12 @@ abstract class DefineRequest(val handleUri: String, val method: Method = Method.
     }
     val nodes = html(request, resp)
     if (nodes.nonEmpty) {
+      val docType = """<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd" >"""
       nodes.head match {
         case <html>{_*}</html> =>
-          val docType = """<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd" >"""
           docType + nodes.toString
+        case xml.Unparsed(content) if content.trim.startsWith("<html>") =>
+          docType + content
         case _ =>
           resp.`type`("text/xml; charset=utf-8")
           val xmlPrefix = """<?xml version="1.0" encoding="UTF-8"?>""" + "\n"

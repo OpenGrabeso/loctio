@@ -17,7 +17,7 @@ object ServletRouting {
     IndexHtml,
 
     FrontendStyle,
-    FrontendScript, UdashApp,
+    FrontendScript, UdashApp, DebugTray,
 
     Cleanup
   )
