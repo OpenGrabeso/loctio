@@ -18,6 +18,8 @@ import shared.FutureAt._
 import shared.ChainingSyntax._
 import common.Util._
 
+import scalatags.Text.all._
+
 object UserRestAPIServer {
   trait NotificationContent {
     def htmlResult: String
@@ -482,16 +484,24 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                     val possible = checkRuns.check_runs.filter(_.completed_at <= n.updated_at)
                     val failed = possible.filter(_.conclusion != "success")
 
+                    val actions = "Actions: " + a(
+                      href := s"""https://github.com/${n.repository.full_name}/actions?query=workflow:"$workflow"""",
+                      workflow
+                    ).render
+
                     failed.headOption.orElse(possible.headOption).map {run =>
                       val message =
                         s"""
                             ${successIcon(run.conclusion)}
                            <a href="${run.html_url}">${workflow}</a><br/>
-                           Commit: ${shaLink(n.repository, branch, run.head_sha)}
+                           Commit: ${shaLink(n.repository, branch, run.head_sha)}<br/>
+                           $actions
                          """
 
                       (n.id, Seq.empty, Some(buildStatusHeader(n, "", message)))
-                    }
+                    }.orElse(Some{
+                      (n.id, Seq.empty, Some(buildStatusHeader(n, "", actions)))
+                    })
                   }
 
                 case _ =>
