@@ -53,6 +53,7 @@ trait RepositoryAPI {
     body: String
   ): Future[Comment]
 
+  def commits: CommitsAPI
 }
 
 object RepositoryAPI extends RestClientApiCompanion[EnhancedRestImplicits,RepositoryAPI](EnhancedRestImplicits)
