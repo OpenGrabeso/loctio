@@ -303,10 +303,16 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
             s"""<a href="${shaUrl(repo, sha)}">${repo.full_name}/$branch/${sha.take(12)}</a>"""
           }
 
+          def issueStateIcon(iconName: String): String = {
+            s"""<img class="issue-state-icon" src="/static/small/$iconName.png"></img>"""
+          }
+
           def successIcon(state: String): String = {
             state match {
               case "failure" =>
-                "X"
+                issueStateIcon("x")
+              case "success" =>
+                issueStateIcon("check")
               case _ =>
                 ""
             }
@@ -338,13 +344,10 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
           def buildIssueNotificationHeader(n: common.model.github.Notification, i: Issue): String = {
 
-            def issueStateIcon(iconName: String, style: String): String = {
-              s"""<img class="issue-state-icon" src="/static/small/$iconName.png"></img>"""
-            }
 
             val icon = i.state match {
-              case "closed" => issueStateIcon("issue-closed", "closed")
-              case "open" => issueStateIcon("issue-opened", "open")
+              case "closed" => issueStateIcon("issue-closed")
+              case "open" => issueStateIcon("issue-opened")
               case _ => ""
             }
 
