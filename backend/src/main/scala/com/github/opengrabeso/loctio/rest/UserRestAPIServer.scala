@@ -303,6 +303,15 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
             s"""<a href="${shaUrl(repo, sha)}">${repo.full_name}/$branch/${sha.take(12)}</a>"""
           }
 
+          def successIcon(state: String): String = {
+            state match {
+              case "failure" =>
+                "X"
+              case _ =>
+                ""
+            }
+          }
+
           def buildNotificationHeader(n: common.model.github.Notification, prefix: String = ""): String = {
             //language=HTML
             s"""
@@ -464,14 +473,21 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               val ExtractBranch = "(.*) workflow .* for ([^ ]+) branch.*".r
               n.subject.title match {
                 case ExtractBranch(workflow, branch) =>
-                  val statuses = api.repos(n.repository.owner.login, n.repository.name).commits(branch).status.awaitNow
-                  statuses.statuses.find(_.state != "success").map { status =>
-                    (
-                      n.id,
-                      Seq.empty,
-                      Some(buildStatusHeader(n, "", workflow + ":" + branch + " " + shaLink(statuses.repository, branch, statuses.sha)))
-                    )
+
+                  Try(api.repos(n.repository.owner.login, n.repository.name).commits(branch).checkRuns(status = "completed").awaitNow).toOption.flatMap {checkRuns =>
+                    // note: checkRuns will always list the latest check run, use a timestamp guess to find the most likely run
+                    checkRuns.check_runs.headOption.map {run =>
+                      val message =
+                        s"""
+                            ${successIcon(run.conclusion)}
+                           <a href="${run.html_url}">${workflow}</a><br/>
+                           Commit: ${shaLink(n.repository, branch, run.head_sha)}
+                         """
+
+                      (n.id, Seq.empty, Some(buildStatusHeader(n, "", message)))
+                    }
                   }
+
                 case _ =>
                   None
               }
