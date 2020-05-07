@@ -265,7 +265,8 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
       //println(s"notifications.get ${userAuth.login}: since $ifModifiedSince")
 
-      val r = gitHubAPI.api.authorized("Bearer " + userAuth.token).notifications.get(
+      val api = gitHubAPI.api.authorized("Bearer " + userAuth.token)
+      val r = api.notifications.get(
         ifModifiedSince,
         per_page = 20 // default 50 is too high, often leads to timeouts
         //all = true
@@ -275,15 +276,15 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
           val oldUnread = recentSession.filter(_.lastModified.nonEmpty).map(_.currentMesages).getOrElse(Seq.empty)
           // cannot compare Notification object, does not have a value based equals
-          val newUnreadIds = newUnread.map(_.subject.url).toSet
-          val readIds = read.map(_.subject.url).toSet
+          val newUnreadIds = newUnread.map(_.id).toSet
+          val readIds = read.map(_.id).toSet
 
           // when a notification with the same id is issues again, it means the topic was updated
           // and we need to re-download the content
-          val keepUnread = oldUnread.filterNot(n => newUnreadIds.contains(n.subject.url) || readIds.contains(n.subject.url))
+          val keepUnread = oldUnread.filterNot(n => newUnreadIds.contains(n.id) || readIds.contains(n.id))
           // remove any message reported as read (I do not think this ever happens, but if it would, we would handle it)
           val unread = newUnread ++ keepUnread
-          val unreadIds = unread.map(_.subject.url).toSet
+          val unreadIds = unread.map(_.id).toSet
 
           println(s"${userAuth.login}: since $ifModifiedSince new: ${newUnread.size}, read: ${read.size}, unread: ${unread.size}")
           // download last comments for the new content
@@ -296,6 +297,12 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
             s"#${issue.number}"
           }
 
+          def shaUrl(repo: Repository, sha: String) = s"""https://github.com/${repo.full_name}/commit/$sha"""
+
+          def shaLink(repo: Repository, branch: String, sha: String) = {
+            s"""<a href="${shaUrl(repo, sha)}">${repo.full_name}/$branch/${sha.take(12)}</a>"""
+          }
+
           def buildNotificationHeader(n: common.model.github.Notification, prefix: String = ""): String = {
             //language=HTML
             s"""
@@ -306,6 +313,18 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               <span class="message reason ${n.reason}">${n.reason}</span>
              </div>
              """
+          }
+
+          def buildStatusHeader(n: common.model.github.Notification, prefix: String, message: String): String = {
+            //language=HTML
+            s"""
+            <div class="notification header">
+              $prefix<span class="message title">${n.subject.title}</span><br/>
+              ${n.repository.full_name}
+              <span class="message time"><time>${n.updated_at}</time></span>
+              <span class="message reason ${n.reason}">${n.reason}</span>
+             </div>
+             """ + (if (message.nonEmpty) s"""<div class="notification body">$message</div>""" else "")
           }
 
           def buildIssueNotificationHeader(n: common.model.github.Notification, i: Issue): String = {
@@ -340,7 +359,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
                 def buildCommentContent(linkUrl: String, linkText: String, by: String, time: ZonedDateTime, body: String) = {
                   val context = n.repository.full_name
-                  val markdown = gitHubAPI.api.authorized("Bearer " + userAuth.token).markdown.markdown(body, mode = "gfm", context = context).awaitNow
+                  val markdown = api.markdown.markdown(body, mode = "gfm", context = context).awaitNow
                   CommentContent(
                     linkUrl,
                     linkText,
@@ -369,7 +388,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
                 val comments = Try {
 
-                  val issuesAPI = gitHubAPI.api.authorized("Bearer " + userAuth.token)
+                  val issuesAPI = api
                     .repos(n.repository.owner.login, n.repository.name)
                     .issuesAPI(issue.number)
                   val commentsSince = issuesAPI
@@ -421,7 +440,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                 } else Seq(issueData)
 
                 (
-                  n.subject.url,
+                  n.id,
                   commentData,
                   Some(buildIssueNotificationHeader(n, issue))
                 )
@@ -431,7 +450,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               import rest.github.EnhancedRestImplicits._
               val response = Try(gitHubAPI.request[Release](n.subject.url, userAuth.token).awaitNow).toOption
               for (release <- response) yield (
-                n.subject.url,
+                n.id,
                 Seq(CommentContent(
                   release.html_url,
                   s"${release.tag_name}",
@@ -442,13 +461,27 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                 None
               )
             case n if n.subject.`type` == "CheckSuite" =>
-              None
+              val ExtractBranch = "(.*) workflow .* for ([^ ]+) branch.*".r
+              n.subject.title match {
+                case ExtractBranch(workflow, branch) =>
+                  val statuses = api.repos(n.repository.owner.login, n.repository.name).commits(branch).status.awaitNow
+                  statuses.statuses.find(_.state != "success").map { status =>
+                    (
+                      n.id,
+                      Seq.empty,
+                      Some(buildStatusHeader(n, "", workflow + ":" + branch + " " + shaLink(statuses.repository, branch, statuses.sha)))
+                    )
+                  }
+                case _ =>
+                  None
+              }
+
             case n if n.subject.`type` == "Commit" =>
               import rest.github.EnhancedRestImplicits._
               val response = Try(gitHubAPI.request[Commit](n.subject.url, userAuth.token).awaitNow).toOption
               for (release <- response) yield {
                 (
-                  n.subject.url,
+                  n.id,
                   Seq(CommentContent(
                     release.html_url,
                     s"${release.sha}",
@@ -469,8 +502,8 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           val infos = recentSession.map(_.info.filterKeys(unreadIds.contains).map(identity)).getOrElse(Map.empty) ++ newComments.flatMap(c => c._3.map(c3 => c._1 -> c3))
 
           def notificationHTML(n: common.model.github.Notification, comments: Map[String, Seq[NotificationContent]], infos: Map[String, String]) = {
-            val header = infos.getOrElse(n.subject.url, buildNotificationHeader(n))
-            comments.get(n.subject.url).map { cs =>
+            val header = infos.getOrElse(n.id, buildNotificationHeader(n))
+            comments.get(n.id).map { cs =>
               header + cs.map(_.htmlResult).mkString("\n")
             }.getOrElse(header)
           }
