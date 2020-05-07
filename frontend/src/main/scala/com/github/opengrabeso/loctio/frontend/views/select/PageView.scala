@@ -137,7 +137,7 @@ class PageView(
         def seqIfElse(cond: Boolean)(value: => UdashDropdown.DefaultDropdownItem)(elseValue: => UdashDropdown.DefaultDropdownItem) = {
           if (cond) Seq(value) else Seq(elseValue)
         }
-        seqIfElse(ar.watch == Relation.No) {
+        base ++ seqIfElse(ar.watch == Relation.No) {
           UdashDropdown.DefaultDropdownItem.Button(s"Request watching", () => presenter.requestWatching(ar.login))
         } {
           UdashDropdown.DefaultDropdownItem.Button(s"Stop watching", () => presenter.stopWatching(ar.login))
