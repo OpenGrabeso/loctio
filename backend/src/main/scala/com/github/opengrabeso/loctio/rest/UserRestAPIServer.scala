@@ -477,9 +477,12 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               n.subject.title match {
                 case ExtractBranch(workflow, branch) =>
 
-                  Try(api.repos(n.repository.owner.login, n.repository.name).commits(branch).checkRuns(status = "completed").awaitNow).toOption.flatMap {checkRuns =>
+                  Try(api.repos(n.repository.owner.login, n.repository.name).commits(branch).checkRuns(status = "completed", filter = "all").awaitNow).toOption.flatMap {checkRuns =>
                     // note: checkRuns will always list the latest check run, use a timestamp guess to find the most likely run
-                    checkRuns.check_runs.headOption.map {run =>
+                    val possible = checkRuns.check_runs.filter(_.completed_at <= n.updated_at)
+                    val failed = possible.filter(_.conclusion != "success")
+
+                    failed.headOption.orElse(possible.headOption).map {run =>
                       val message =
                         s"""
                             ${successIcon(run.conclusion)}
