@@ -332,11 +332,11 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
              """
           }
 
-          def buildStatusHeader(n: common.model.github.Notification, prefix: String, message: String): String = {
+          def buildStatusHeader(n: common.model.github.Notification, title: String, message: String): String = {
             //language=HTML
             s"""
             <div class="notification header">
-              $prefix<span class="message title">${n.subject.title}</span><br/>
+              $title<br/>
               ${n.repository.full_name}
               <span class="message time"><time>${n.updated_at}</time></span>
               <span class="message reason ${n.reason}">${n.reason}</span>
@@ -475,32 +475,34 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                 None
               )
             case n if n.subject.`type` == "CheckSuite" =>
-              val ExtractBranch = "(.*) workflow .* for ([^ ]+) branch.*".r
+              val ExtractBranch = "(.*)( workflow .* for )([^ ]+)( branch.*)".r
               n.subject.title match {
-                case ExtractBranch(workflow, branch) =>
+                case ExtractBranch(workflow, infix, branch, postfix) =>
 
                   Try(api.repos(n.repository.owner.login, n.repository.name).commits(branch).checkRuns(status = "completed", filter = "all").awaitNow).toOption.flatMap {checkRuns =>
                     // note: checkRuns will always list the latest check run, use a timestamp guess to find the most likely run
                     val possible = checkRuns.check_runs.filter(_.completed_at <= n.updated_at)
                     val failed = possible.filter(_.conclusion != "success")
 
-                    val actions = "Actions: " + a(
-                      href := s"""https://github.com/${n.repository.full_name}/actions?query=workflow:"$workflow"""",
+                    def queryParEncode(q: String) = java.net.URLEncoder.encode(q, "UTF-8")
+                    val workflowLink = a(
+                      href := s"""https://github.com/${n.repository.full_name}/actions?query=${queryParEncode(s"""workflow:"$workflow"""")}""",
                       workflow
                     ).render
+
+                    val title = s"""<span class="message title">$workflowLink$infix$branch$postfix</span>"""
 
                     failed.headOption.orElse(possible.headOption).map {run =>
                       val message =
                         s"""
-                            ${successIcon(run.conclusion)}
-                           <a href="${run.html_url}">${workflow}</a><br/>
+                           ${successIcon(run.conclusion)}
+                           Run: <a href="${run.html_url}">${workflow}</a><br/>
                            Commit: ${shaLink(n.repository, branch, run.head_sha)}<br/>
-                           $actions
                          """
 
-                      (n.id, Seq.empty, Some(buildStatusHeader(n, "", message)))
+                      (n.id, Seq.empty, Some(buildStatusHeader(n, title, message)))
                     }.orElse(Some{
-                      (n.id, Seq.empty, Some(buildStatusHeader(n, "", actions)))
+                      (n.id, Seq.empty, Some(buildStatusHeader(n, title, "")))
                     })
                   }
 
@@ -540,21 +542,23 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
             }.getOrElse(header)
           }
 
-          val notificationsTable =
-          //language=HTML
-            s"""<html>
-              <head>
-              <link href="static/tray.css" rel="stylesheet" />
-              <link href="rest/issues.css" rel="stylesheet" />
-              </head>
-              <body class="notifications">
-                <p><a href="https://www.github.com/notifications">GitHub notifications</a></p>
-                <div class="notification table">
-                ${unread.map("<div class='notification item'>" + notificationHTML(_, comments, infos) + "</div>").mkString}
-                </div>
-              </body>
-             </html>
-            """
+          val notificationsTable = html(
+            head(
+              link(href := "static/tray.css", rel := "stylesheet"),
+              link(href := "rest/issues.css", rel := "stylesheet"),
+            ),
+            body(
+              cls := "notifications",
+              p(
+                a(href := "https://www.github.com/notifications", "GitHub notifications")
+              ),
+              div(
+                cls := "notification table",
+                raw(unread.map("<div class='notification item'>" + notificationHTML(_, comments, infos) + "</div>").mkString)
+              )
+
+            )
+          ).render
 
           // is it really sorted by updated_at, or some other (internal) update timestamp (e.g. when last_read_at is higher than updated_at?)
           val mostRecentNotified = recentSession.flatMap(_.mostRecentNotified)
