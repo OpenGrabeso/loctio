@@ -1,7 +1,6 @@
 package com.github.opengrabeso.loctio
 
 import java.awt.{AWTException, Desktop}
-import java.awt.event.{KeyAdapter, KeyEvent, MouseAdapter, MouseEvent, MouseWheelEvent}
 import java.net.URL
 import java.time.{ZoneId, ZonedDateTime}
 import java.time.format._
@@ -9,17 +8,19 @@ import java.util.Locale
 
 import akka.actor.{ActorSystem, Cancellable}
 import com.github.opengrabeso.loctio.common.PublicIpAddress
-import com.github.opengrabeso.loctio.common.model.github.Notification
-import com.github.opengrabeso.loctio.rest.github.AuthorizedAPI
+import com.github.opengrabeso.github.model.Notification
+import com.github.opengrabeso.github.rest.AuthorizedAPI
+import com.github.opengrabeso.github.{RestAPIClient => GitHubAPIClient}
 import javax.swing.SwingUtilities
 import javax.imageio.ImageIO
-import java.awt.{TrayIcon, SystemTray, Image}
+import java.awt.{Image, SystemTray, TrayIcon}
+
+import io.udash.rest.SttpRestClient
 import rest.{RestAPI, RestAPIClient}
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future, Promise, duration}
 import scala.swing._
-import scala.util.{Failure, Success}
 import scala.swing.Swing._
 import shared.ChainingSyntax._
 
@@ -74,7 +75,7 @@ object Start extends SimpleSwingApplication {
 
     def localServerConfirmed(confirmed: ServerUsed): Unit = synchronized {
       println(s"Confirmed local server ${confirmed.url}")
-      if (!serverFound.tryComplete(Success(confirmed))) {
+      if (!serverFound.trySuccess(confirmed)) {
         // we always use only the first server confirmed
         // a developer should not run both
         println(s"Warning: we are already connected to ${serverFound.future.value.flatMap(_.toOption).getOrElse("None")}")
@@ -103,7 +104,8 @@ object Start extends SimpleSwingApplication {
     Future.failed(throw new NoSuchElementException("No token provided"))
   }
 
-  def githubApi(token: String): AuthorizedAPI = rest.github.GitHubAPIClient.api.authorized("Bearer " + cfg.token)
+  object gitHubAPIClient extends GitHubAPIClient(SttpRestClient.defaultBackend())
+  def githubApi(token: String): AuthorizedAPI = gitHubAPIClient.api.authorized("Bearer " + cfg.token)
 
   def login() = {
     assert(SwingUtilities.isEventDispatchThread)

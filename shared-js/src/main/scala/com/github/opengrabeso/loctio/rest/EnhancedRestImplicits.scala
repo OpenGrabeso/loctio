@@ -1,6 +1,7 @@
 package com.github.opengrabeso.loctio
 package rest
 
+import com.github.opengrabeso.github.rest.ZonedDateTimeCodecs
 import com.avsystem.commons.meta.MacroInstances
 import com.avsystem.commons.serialization.{GenCodec, HasGenCodecWithDeps}
 import io.udash.rest._

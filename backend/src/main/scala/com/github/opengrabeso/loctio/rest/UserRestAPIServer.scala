@@ -7,7 +7,9 @@ import java.time.temporal.ChronoUnit
 import com.softwaremill.sttp.HttpURLConnectionBackend
 import common.FileStore
 import common.model._
-import common.model.github._
+import com.github.opengrabeso.github
+import com.github.opengrabeso.github.{RestAPIClient => GitHubAPIClient}
+import com.github.opengrabeso.github.model._
 import io.udash.rest.raw.HttpErrorException
 
 import scala.concurrent.Await
@@ -320,7 +322,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
             }
           }
 
-          def buildNotificationHeader(n: common.model.github.Notification, prefix: String = ""): String = {
+          def buildNotificationHeader(n: Notification, prefix: String = ""): String = {
             //language=HTML
             s"""
             <div class="notification header">
@@ -332,7 +334,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
              """
           }
 
-          def buildStatusHeader(n: common.model.github.Notification, title: String, message: String): String = {
+          def buildStatusHeader(n: Notification, title: String, message: String): String = {
             //language=HTML
             s"""
             <div class="notification header">
@@ -344,7 +346,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
              """ + (if (message.nonEmpty) s"""<div class="notification body">$message</div>""" else "")
           }
 
-          def buildIssueNotificationHeader(n: common.model.github.Notification, i: Issue): String = {
+          def buildIssueNotificationHeader(n: Notification, i: Issue): String = {
 
 
             val icon = i.state match {
@@ -360,7 +362,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           val newComments = newUnread.flatMap {
             case n if n.subject.`type` == "Issue" =>
               // the issue may have no comments
-              import rest.github.EnhancedRestImplicits._
+              import github.rest.EnhancedRestImplicits._
 
               // if there is a comment, the only reason why we need to get the issue is to get its number (we need it for the link)
               val issueResponse = Try(gitHubAPI.request[Issue](n.subject.url, userAuth.token).awaitNow).toOption
@@ -461,7 +463,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
               }
             case n if n.subject.`type` == "Release" =>
-              import rest.github.EnhancedRestImplicits._
+              import github.rest.EnhancedRestImplicits._
               val response = Try(gitHubAPI.request[Release](n.subject.url, userAuth.token).awaitNow).toOption
               for (release <- response) yield (
                 n.id,
@@ -511,7 +513,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               }
 
             case n if n.subject.`type` == "Commit" =>
-              import rest.github.EnhancedRestImplicits._
+              import github.rest.EnhancedRestImplicits._
               val response = Try(gitHubAPI.request[Commit](n.subject.url, userAuth.token).awaitNow).toOption
               for (release <- response) yield {
                 (
@@ -535,7 +537,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           val comments = recentSession.map(_.lastComments.filterKeys(unreadIds.contains).map(identity)).getOrElse(Map.empty) ++ newComments.map(c => c._1 -> c._2)
           val infos = recentSession.map(_.info.filterKeys(unreadIds.contains).map(identity)).getOrElse(Map.empty) ++ newComments.flatMap(c => c._3.map(c3 => c._1 -> c3))
 
-          def notificationHTML(n: common.model.github.Notification, comments: Map[String, Seq[NotificationContent]], infos: Map[String, String]) = {
+          def notificationHTML(n: Notification, comments: Map[String, Seq[NotificationContent]], infos: Map[String, String]) = {
             val header = infos.getOrElse(n.id, buildNotificationHeader(n))
             comments.get(n.id).map { cs =>
               header + cs.map(_.htmlResult).mkString("\n")
@@ -591,7 +593,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
           val nextAfter = response.headers.xPollInterval.map(_.toInt).getOrElse(60)
           Success(notificationsTable, notifyUser, nextAfter)
-        case Failure(rest.github.DataWithHeaders.HttpErrorExceptionWithHeaders(ex, headers)) =>
+        case Failure(github.rest.DataWithHeaders.HttpErrorExceptionWithHeaders(ex, headers)) =>
           val nextAfter = headers.xPollInterval.map(_.toInt).getOrElse(60)
 
           for (s <- recentSession) { // update the session info to keep alive (prevent resetting)

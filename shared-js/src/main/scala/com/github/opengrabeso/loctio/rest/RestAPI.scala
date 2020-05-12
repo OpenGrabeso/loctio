@@ -10,7 +10,7 @@ import scala.concurrent.Future
 
 trait RestAPI {
 
-  @GET
+  @GET("loctio-ping")
   def identity(@Path in: String): Future[String]
 
   def user(token: String): UserRestAPI
