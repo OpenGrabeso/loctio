@@ -360,7 +360,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           }
 
           val newComments = newUnread.flatMap {
-            case n if n.subject.`type` == "Issue" =>
+            case n if n.subject.`type` == "Issue" || n.subject.`type` == "PullRequest" =>
               // the issue may have no comments
               import github.rest.EnhancedRestImplicits._
 
