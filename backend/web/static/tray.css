@@ -90,6 +90,10 @@ assign, author, comment, invitation, manual, mention, review_requested, security
     background-color: #fffff5;
 }
 
+.notification img {
+    -fs-fit-images-to-width: 100%;
+}
+
 .icon {
     height: 16px;
     width: 16px
