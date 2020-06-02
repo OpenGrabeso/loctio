@@ -195,7 +195,7 @@ class PageView(
 
     def getErrorText(ex: Throwable) = ex match {
       case he: HttpErrorException =>
-        s"HTTP Error ${he.code}"
+        s"HTTP Error ${he.code} ${he.payload.getOrElse("")}"
       case _ =>
         ex.toString
     }

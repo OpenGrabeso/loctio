@@ -107,7 +107,14 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
   def addUser(userName: String) = syncResponse {
     Main.authorizedAdmin(userAuth.login)
+    if (Main.checkAdminAuthorized(userName)) {
+      throw HttpErrorException(400, "Cannot add admin as an ordinary user")
+    }
+    if (Main.checkUserAuthorized(userName)) {
+      throw HttpErrorException(400, "User already exists")
+    }
     Storage.store(FileStore.FullName("users", userName), "user")
+    Presence.listUsers(userAuth.login, true)
   }
 
   private def listUsersSync(ipAddress: String, state: String, requests: Boolean = false) = {
@@ -133,23 +140,30 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
     listUsersSync(ipAddress, state, true)
   }
 
+  private def differentUserRequired(user: String): Unit = {
+    if (userAuth.login == user) throw HttpErrorException(400, "Only different users can be watched")
+  }
 
   def requestWatching(user: String) = syncResponse {
+    differentUserRequired(user)
     Presence.requestWatching(userAuth.login, user)
     Presence.listUsers(userAuth.login, true)
   }
 
   def stopWatching(user: String) = syncResponse {
+    differentUserRequired(user)
     Presence.stopWatching(userAuth.login, user)
     Presence.listUsers(userAuth.login, true)
   }
 
   def allowWatchingMe(user: String) = syncResponse {
+    differentUserRequired(user)
     Presence.allowWatchingMe(userAuth.login, user)
     Presence.listUsers(userAuth.login, true)
   }
 
   def disallowWatchingMe(user: String) = syncResponse {
+    differentUserRequired(user)
     Presence.disallowWatchingMe(userAuth.login, user)
     Presence.listUsers(userAuth.login, true)
   }

@@ -29,7 +29,7 @@ trait UserRestAPI {
   def trayNotificationsHTML(): Future[(String, Seq[String], Int)]
 
   @PUT("users")
-  def addUser(userName: String): Future[Unit]
+  def addUser(userName: String): Future[Seq[(String, LocationInfo)]]
 
   @POST
   @CustomBody

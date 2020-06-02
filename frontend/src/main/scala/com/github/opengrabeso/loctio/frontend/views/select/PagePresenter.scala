@@ -162,7 +162,7 @@ class PagePresenter(
   }
 
   def addUser(user: String): Unit = {
-    userAPI.addUser(user)
+    userAPI.addUser(user).onComplete(loadUsersCallback(currentToken, _))
   }
 
   def changeUserState(s: String): Unit = {
