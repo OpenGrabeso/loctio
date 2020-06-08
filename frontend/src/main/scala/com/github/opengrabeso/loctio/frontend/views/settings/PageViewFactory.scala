@@ -20,8 +20,6 @@ class PageViewFactory(
     val presenter = new PagePresenter(model, application, rpc)
     val view = new PageView(model, presenter)
 
-    presenter.init()
-
     (view, presenter)
   }
 }

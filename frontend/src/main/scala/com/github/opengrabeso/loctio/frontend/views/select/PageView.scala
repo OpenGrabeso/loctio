@@ -21,6 +21,7 @@ class PageView(
 ) extends Headers.PageView(model, presenter) with FinalView with CssView with PageUtils with TimeFormatting {
   val s = SelectPageStyles
 
+  val settings = ApplicationContext.settings
 
   def getUserStatusIcon(state: String) = {
     img(
@@ -122,8 +123,8 @@ class PageView(
     // change of login will force the table to be created again
     // transformToSeq binding is currently not needed, as change of invisibility will re-create the table
     // but it is nicer that way (and the re-creation might no longer happen in future)
-    val items = model.subModel(_.settings).subProp(_.state).transformToSeq { state =>
-      val current = ar.login == model.subModel(_.settings).subProp(_.login).get
+    val items = settings.subProp(_.state).transformToSeq { state =>
+      val current = ar.login == settings.subProp(_.login).get
       val base = Seq(
         UdashDropdown.DefaultDropdownItem.Button("Name location", callback),
       )
@@ -168,7 +169,7 @@ class PageView(
         "Last seen",
         (ar, _, _) => if (ar.currentState != "online" && ar.currentState != "busy" && ar.currentState != "unknown") common.UserState.smartTime(ar.lastTime, formatTime, formatDate, formatDayOfWeek).render else ""
       ),
-      TableFactory.TableAttrib("Watching me", (ar, _, _) => if (ar.login != model.subProp(_.settings.login).get) ar.watchingMe.toString.render else ""),
+      TableFactory.TableAttrib("Watching me", (ar, _, _) => if (ar.login != settings.subProp(_.login).get) ar.watchingMe.toString.render else ""),
       TableFactory.TableAttrib("", (ar, _, _) => userDropDown(ar)),
     )
     val partialAttribs = Seq[DisplayAttrib](
@@ -213,7 +214,7 @@ class PageView(
                 watchUserButton.render,
                 showIf(usersPartial.transform(_.nonEmpty))(Seq(tablePartial.render)),
 
-                showIf(globals.subProp(_.role).transform(_ == "admin"))(Seq(" ".render, addUserButton.render))
+                showIf(settings.subProp(_.role).transform(_ == "admin"))(Seq(" ".render, addUserButton.render))
               ).render
             )
           )

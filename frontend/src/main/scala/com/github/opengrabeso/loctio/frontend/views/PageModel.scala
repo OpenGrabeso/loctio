@@ -8,7 +8,6 @@ import io.udash._
 case class PageModel(
   loading: Boolean,
   debug: String = null,
-  settings: dataModel.SettingsModel = dataModel.SettingsModel(),
   users: Seq[UserRow] = Seq.empty,
   allUsers: Seq[String] = Seq.empty,
   error: Option[Throwable] = None

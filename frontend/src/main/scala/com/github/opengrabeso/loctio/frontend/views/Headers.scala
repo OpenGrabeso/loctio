@@ -2,8 +2,7 @@ package com.github.opengrabeso.loctio
 package frontend
 package views
 
-import com.github.opengrabeso.loctio.common.css.{GlobalStyles, SelectPageStyles}
-import com.github.opengrabeso.loctio.dataModel.SettingsModel
+import com.github.opengrabeso.loctio.common.css.GlobalStyles
 import routing._
 import io.udash._
 import io.udash.bootstrap._
@@ -25,7 +24,7 @@ object Headers {
 
     import scalatags.JsDom.all._
 
-    protected def globals = model.subModel(_.settings)
+    protected val globals = ApplicationContext.settings
 
     private val settingsToken = Property[String]("")
     private val settingsOkButton = UdashButton(
@@ -55,7 +54,7 @@ object Headers {
     )
 
     private val settingsButton = button("Log in".toProperty)
-    private val preferencesButton = faIconButton("gear", "Settings".toProperty)
+    private val preferencesButton = faIconButton("cog", "Settings".toProperty)
     private val adminButton = faIconButton("cogs", "Site administration".toProperty)
 
     buttonOnClick(settingsButton) {
