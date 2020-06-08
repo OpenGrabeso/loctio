@@ -5,7 +5,7 @@ import java.util.Properties
 import com.fasterxml.jackson.databind.JsonNode
 import com.google.api.client.http.{GenericUrl, HttpHeaders, HttpResponseException}
 import io.udash.rest.raw.HttpErrorException
-import shared.ChainingSyntax._
+import common.ChainingSyntax._
 
 object Main extends common.Formatting {
 

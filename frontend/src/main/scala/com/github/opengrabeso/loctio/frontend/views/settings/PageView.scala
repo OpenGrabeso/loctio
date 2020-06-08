@@ -3,16 +3,12 @@ package frontend
 package views
 package settings
 
-import common.model.{Relation, UserRow}
+import common.ChainingSyntax._
+
 import common.css._
 import io.udash._
-import io.udash.bootstrap.button.UdashButton
-import io.udash.bootstrap.dropdown.UdashDropdown
-import io.udash.bootstrap.modal.UdashModal
 import io.udash.bootstrap.utils.BootstrapStyles._
-import io.udash.bootstrap.table.UdashTable
 import io.udash.css._
-import io.udash.rest.raw.HttpErrorException
 import scalatags.JsDom.all._
 
 class PageView(
@@ -26,6 +22,17 @@ class PageView(
       prefix,
       header,
       h1("Settings"),
+
+      div(
+        Flex.row(),
+        div(
+          Flex.column(),
+          button("Submit".toProperty).tap(buttonOnClick(_)(presenter.gotoMain())),
+        ),
+        div(
+          Flex.column()
+        )
+      ),
       footer
     )
   }

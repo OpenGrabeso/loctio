@@ -1,4 +1,4 @@
-package com.github.opengrabeso.loctio.shared
+package com.github.opengrabeso.loctio.common
 
 import scala.language.implicitConversions
 

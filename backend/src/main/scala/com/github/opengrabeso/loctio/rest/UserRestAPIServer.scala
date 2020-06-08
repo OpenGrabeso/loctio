@@ -17,7 +17,7 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 import shared.FutureAt._
-import shared.ChainingSyntax._
+import common.ChainingSyntax._
 import common.Util._
 
 import scalatags.Text.all._
