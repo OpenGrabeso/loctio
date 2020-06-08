@@ -10,10 +10,8 @@ import common.model._
 import routing._
 import io.udash._
 import io.udash.wrappers.jquery.jQ
-import org.scalajs.dom
 
 import scala.concurrent.{ExecutionContext, Promise}
-import scala.scalajs.js
 import scala.scalajs.js.timers._
 import scala.util.{Failure, Success, Try}
 

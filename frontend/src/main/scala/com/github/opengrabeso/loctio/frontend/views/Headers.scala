@@ -18,6 +18,7 @@ import org.scalajs.dom.raw.HTMLElement
 object Headers {
   abstract class PagePresenter[T<: State](application: Application[RoutingState]) extends Presenter[T] {
     def gotoMain(): Unit = application.goTo(SelectPageState)
+    def gotoPreferences() = application.goTo(SettingsPageState)
   }
   abstract class PageView[T<: State](model: ModelProperty[PageModel], presenter: PagePresenter[T]) extends CssView with PageUtils {
     def onAdminClick(): Unit
@@ -54,7 +55,8 @@ object Headers {
     )
 
     private val settingsButton = button("Log in".toProperty)
-    private val adminButton = faIconButton("cogs", " Site administration".toProperty)
+    private val preferencesButton = faIconButton("gear", "Settings".toProperty)
+    private val adminButton = faIconButton("cogs", "Site administration".toProperty)
 
     buttonOnClick(settingsButton) {
       settingsToken.set("")
@@ -64,6 +66,10 @@ object Headers {
     buttonOnClick(adminButton) {
       onAdminClick()
     }
+    buttonOnClick(preferencesButton) {
+      presenter.gotoPreferences()
+    }
+
     val prefix = Seq[Modifier](
       // loads Bootstrap and FontAwesome styles from CDN
       UdashBootstrap.loadBootstrapStyles(),
@@ -102,6 +108,7 @@ object Headers {
           ),
         ),
         div(Flex.grow1()),
+        td(preferencesButton).render,
         showIf(globals.subProp(_.role).transform(_ == "admin")) (
           Seq[Node](
             td(adminButton).render

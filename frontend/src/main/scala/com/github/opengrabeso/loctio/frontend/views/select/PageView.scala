@@ -3,8 +3,6 @@ package frontend
 package views
 package select
 
-import java.time.{Duration, ZonedDateTime}
-
 import common.model.{Relation, UserRow}
 import common.css._
 import io.udash._
@@ -15,7 +13,6 @@ import io.udash.bootstrap.utils.BootstrapStyles._
 import io.udash.bootstrap.table.UdashTable
 import io.udash.css._
 import io.udash.rest.raw.HttpErrorException
-import org.scalajs.dom.Node
 import scalatags.JsDom.all._
 
 class PageView(
