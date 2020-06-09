@@ -44,7 +44,9 @@ object ApplicationContext {
         settingsFor.success(s)
         serverSettings.set(s)
       case Failure(ex) =>
-        settingsFor.failure(ex)
+        val default = UserSettings(timezone = views.TimeFormatting.timezone)
+        settingsFor.success(default)
+        serverSettings.set(default)
     }
     rpc.user(token).name.onComplete {
       case Success(r) =>

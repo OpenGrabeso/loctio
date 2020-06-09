@@ -22,4 +22,8 @@ class PagePresenter(
   def submit(): Future[Unit] = {
     rpc.user(ApplicationContext.currentToken).settings(ApplicationContext.serverSettings.get)
   }
+
+  def guessTimezone(): Unit = {
+    ApplicationContext.serverSettings.subProp(_.timezone).set(TimeFormatting.timezone)
+  }
 }

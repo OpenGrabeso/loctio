@@ -45,6 +45,11 @@ class PageView(
         NumberInput(userSettings.subProp(_.visibleHoursTo).asString)(hourModifiers),
         ":",
         NumberInput(userSettings.subProp(_.visibleMinutesTo).asString)(minuteModifiers),
+        " timezone",
+        TextInput(userSettings.subProp(_.timezone))(),
+        button("Autodetect timezone".toProperty).tap(buttonOnClick(_){
+          presenter.guessTimezone()
+        }),
         div(Flex.grow1())
       ),
       div(

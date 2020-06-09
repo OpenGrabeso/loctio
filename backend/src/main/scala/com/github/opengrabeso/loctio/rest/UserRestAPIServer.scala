@@ -1,7 +1,7 @@
 package com.github.opengrabeso.loctio
 package rest
 
-import java.time.ZonedDateTime
+import java.time.{LocalDateTime, ZoneId, ZonedDateTime}
 import java.time.temporal.ChronoUnit
 
 import com.avsystem.commons.serialization.json.{JsonStringInput, JsonStringOutput}
@@ -105,11 +105,15 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
     (userAuth.login, userAuth.fullName, if (isAdmin) "admin" else "user")
   }
 
-  def settings = syncResponse {
-    // TODO: load settings properly
-    // TODO: support Storage with a codec
+  private def currentUserSettings: Option[UserSettings] = {
     val json = Storage.load[String](FileStore.FullName("settings", userAuth.login))
-    json.map(JsonStringInput.read[UserSettings](_)).getOrElse(UserSettings())
+    json.map(JsonStringInput.read[UserSettings](_))
+  }
+
+  def settings = syncResponse {
+    currentUserSettings.getOrElse {
+      throw HttpErrorException(404, "No settings for the user yet")
+    }
   }
 
   def settings(s: UserSettings) = syncResponse {
@@ -128,7 +132,32 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
     Presence.listUsers(userAuth.login, true)
   }
 
-  private def listUsersSync(ipAddress: String, state: String, requests: Boolean = false) = {
+  private def checkAutoInvisible(settings: UserSettings) = {
+    val zone = Try(ZoneId.of(settings.timezone)).getOrElse(ZoneId.of("UTC"))
+    val localNow = LocalDateTime.now(zone)
+
+
+    val localMinutes = localNow.getHour * 60 + localNow.getMinute
+    val visibleFromMinutes = settings.visibleHoursFrom * 60 + settings.visibleMinutesFrom
+    val visibleToMinutes = settings.visibleHoursTo * 60 + settings.visibleMinutesTo
+
+    //println(s"Local now $localNow for $zone $localMinutes in $visibleFromMinutes..$visibleToMinutes")
+
+    localMinutes < visibleFromMinutes || localMinutes > visibleToMinutes
+  }
+
+  private def listUsersSync(ipAddress: String, realState: String, requests: Boolean = false) = {
+    val settings = currentUserSettings.getOrElse(UserSettings())
+
+    val forceInvisible = checkAutoInvisible(settings)
+
+    val state = (forceInvisible, realState) match {
+      case (true, "online" | "busy" | "away") =>
+        "invisible"
+      case _ =>
+        realState
+    }
+
     checkState(state)
     checkIpAddress(ipAddress)
     // when the user is away or invisible, do not update his presence

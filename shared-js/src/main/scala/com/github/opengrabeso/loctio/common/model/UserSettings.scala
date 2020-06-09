@@ -10,6 +10,7 @@ case class UserSettings(
   visibleMinutesFrom: Int = 0,
   visibleHoursTo: Int = 24,
   visibleMinutesTo: Int = 0,
+  timezone: String = "UTC",
   displayLocation: Boolean = true
 )
 
