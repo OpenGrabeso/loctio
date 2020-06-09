@@ -7,7 +7,7 @@ import rest.RestAPI
 import routing._
 import io.udash._
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 
 /** Contains the business logic of this view. */
@@ -18,4 +18,8 @@ class PagePresenter(
 )(implicit ec: ExecutionContext) extends Headers.PagePresenter[SettingsPageState.type](application) {
 
   def handleState(state: SettingsPageState.type) = {}
+
+  def submit(): Future[Unit] = {
+    rpc.user(ApplicationContext.currentToken).settings(ApplicationContext.serverSettings.get)
+  }
 }

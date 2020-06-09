@@ -12,6 +12,8 @@ import scalatags.JsDom.all._
 
 import scala.util.Try
 
+import scala.concurrent.ExecutionContext.Implicits.global
+
 class PageView(
   model: ModelProperty[PageModel],
   presenter: PagePresenter
@@ -49,7 +51,9 @@ class PageView(
         Flex.row(),Flex.grow0(),
         div(
           Flex.column(),
-          button("Submit".toProperty).tap(buttonOnClick(_)(presenter.gotoMain())),
+          button("Submit".toProperty).tap(buttonOnClick(_) {
+            presenter.submit().foreach(_ => presenter.gotoMain())
+          }),
         ),
         div(
           Flex.column()

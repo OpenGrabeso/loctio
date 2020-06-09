@@ -4,6 +4,7 @@ package rest
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 
+import com.avsystem.commons.serialization.json.{JsonStringInput, JsonStringOutput}
 import com.softwaremill.sttp.HttpURLConnectionBackend
 import common.FileStore
 import common.model._
@@ -19,7 +20,6 @@ import scala.util.{Failure, Success, Try}
 import shared.FutureAt._
 import common.ChainingSyntax._
 import common.Util._
-
 import scalatags.Text.all._
 
 object UserRestAPIServer {
@@ -106,8 +106,14 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
   }
 
   def settings = syncResponse {
-    // TODO: store settings properly
-    UserSettings()
+    // TODO: load settings properly
+    // TODO: support Storage with a codec
+    val json = Storage.load[String](FileStore.FullName("settings", userAuth.login))
+    json.map(JsonStringInput.read[UserSettings](_)).getOrElse(UserSettings())
+  }
+
+  def settings(s: UserSettings) = syncResponse {
+    Storage.store(FileStore.FullName("settings", userAuth.login), JsonStringOutput.write(s))
   }
 
   def addUser(userName: String) = syncResponse {

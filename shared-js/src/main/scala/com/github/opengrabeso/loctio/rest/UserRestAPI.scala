@@ -19,6 +19,9 @@ trait UserRestAPI {
   def settings: Future[UserSettings]
 
   @POST
+  def settings(s: UserSettings): Future[Unit]
+
+  @POST
   def listUsers(ipAddress: String, state: String): Future[Seq[(String, LocationInfo)]]
 
   @PUT
