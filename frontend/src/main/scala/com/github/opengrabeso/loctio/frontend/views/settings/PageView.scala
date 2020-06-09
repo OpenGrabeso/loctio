@@ -25,6 +25,9 @@ class PageView(
       def asString: Property[String] = intProp.transform(_.toString, s => Try(s.toInt).getOrElse(0))
     }
 
+    val hourModifiers = Seq[Modifier](Flex.grow0(), attr("min") := "0", attr("max") := "24")
+    val minuteModifiers = Seq[Modifier](Flex.grow0(), attr("min") := "0", attr("max") := "60")
+
     div(
       prefix,
       header,
@@ -32,14 +35,14 @@ class PageView(
 
 
       div(Flex.row(),Flex.grow0(),
-        "Available hours: ",
-        TextInput(userSettings.subProp(_.visibleHoursFrom).asString)(Flex.grow0()),
+        "Available hours from ",
+        NumberInput(userSettings.subProp(_.visibleHoursFrom).asString)(hourModifiers),
         ":",
-        TextInput(userSettings.subProp(_.visibleMinutesFrom).asString)(Flex.grow0()),
-        "...",
-        TextInput(userSettings.subProp(_.visibleHoursTo).asString)(Flex.grow0()),
+        NumberInput(userSettings.subProp(_.visibleMinutesFrom).asString)(minuteModifiers),
+        " to ",
+        NumberInput(userSettings.subProp(_.visibleHoursTo).asString)(hourModifiers),
         ":",
-        TextInput(userSettings.subProp(_.visibleMinutesTo).asString)(Flex.grow0()),
+        NumberInput(userSettings.subProp(_.visibleMinutesTo).asString)(minuteModifiers),
         div(Flex.grow1())
       ),
       div(

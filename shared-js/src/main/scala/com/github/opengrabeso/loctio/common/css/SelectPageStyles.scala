@@ -1,6 +1,7 @@
 package com.github.opengrabeso.loctio.common.css
 
 import io.udash.css._
+import scalatags.generic.Attr
 
 import scala.language.postfixOps
 
