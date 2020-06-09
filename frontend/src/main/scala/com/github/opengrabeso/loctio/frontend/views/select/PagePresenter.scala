@@ -32,10 +32,10 @@ class PagePresenter(
   private var interval = Option.empty[SetIntervalHandle]
   private var lastActive: Long = System.currentTimeMillis()
 
-  println("PagePresenter get publicIpAddress and userData")
   for {
     ip <- ApplicationContext.publicIpAddress
     _ <- ApplicationContext.userData.future
+    _ <- ApplicationContext.serverSettingsLoading.future
   } {
     println("startListening")
     startListening(ip)

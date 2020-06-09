@@ -105,6 +105,11 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
     (userAuth.login, userAuth.fullName, if (isAdmin) "admin" else "user")
   }
 
+  def settings = syncResponse {
+    // TODO: store settings properly
+    UserSettings()
+  }
+
   def addUser(userName: String) = syncResponse {
     Main.authorizedAdmin(userAuth.login)
     if (Main.checkAdminAuthorized(userName)) {

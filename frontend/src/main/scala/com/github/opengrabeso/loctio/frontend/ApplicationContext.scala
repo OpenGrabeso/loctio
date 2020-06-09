@@ -21,7 +21,8 @@ object ApplicationContext {
   val application = new Application[RoutingState](routingRegistry, viewFactoryRegistry)
   val rpc: RestAPI = com.github.opengrabeso.loctio.rest.RestAPIClient.api
 
-  val settings = ModelProperty(dataModel.SettingsModel.load)
+  val settings = ModelProperty(dataModel.SettingsModel.load) // local settings
+  val serverSettings = ModelProperty(UserSettings())
 
   val publicIpAddress = PublicIpAddress.get
 
@@ -29,12 +30,22 @@ object ApplicationContext {
   def currentLogin: String = settings.subProp(_.login).get
 
   var userData: Promise[UserContextData] = Promise.failed(new NoSuchElementException)
+  var serverSettingsLoading: Promise[UserSettings] = Promise.failed(new NoSuchElementException) // server based settings
 
   println(s"Create UserContextService, token ${settings.subProp(_.token).get}")
   settings.subProp(_.token).listen {token =>
     println(s"listen: Start login $token")
     userData = Promise()
+    serverSettingsLoading = Promise()
     val loginFor = userData // capture the value, in case another login starts for a different token before this one is completed
+    val settingsFor = serverSettingsLoading
+    rpc.user(token).settings.onComplete {
+      case Success(s) =>
+        settingsFor.success(s)
+        serverSettings.set(s)
+      case Failure(ex) =>
+        settingsFor.failure(ex)
+    }
     rpc.user(token).name.onComplete {
       case Success(r) =>
         println(s"Login - new user $r")
