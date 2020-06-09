@@ -22,6 +22,8 @@ import common.ChainingSyntax._
 import common.Util._
 import scalatags.Text.all._
 
+import scala.collection.JavaConverters._
+
 object UserRestAPIServer {
   trait NotificationContent {
     def htmlResult: String
@@ -118,6 +120,25 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
   def settings(s: UserSettings) = syncResponse {
     Storage.store(FileStore.FullName("settings", userAuth.login), JsonStringOutput.write(s))
+  }
+
+  def listAllTimezones = syncResponse {
+
+    object ZoneComparator extends Ordering[ZoneId] {
+      override def compare(zoneId1: ZoneId, zoneId2: ZoneId) = {
+        val now = LocalDateTime.now
+        val offset1 = now.atZone(zoneId1).getOffset
+        val offset2 = now.atZone(zoneId2).getOffset
+        val r = offset1.compareTo(offset2)
+        if (r != 0) r
+        else zoneId1.getId.compareTo(zoneId2.getId)
+      }
+    }
+
+    ZoneId.getAvailableZoneIds.asScala.toSeq
+      .map(ZoneId.of)
+      .sorted(ZoneComparator)
+      .map(_.getId)
   }
 
   def addUser(userName: String) = syncResponse {

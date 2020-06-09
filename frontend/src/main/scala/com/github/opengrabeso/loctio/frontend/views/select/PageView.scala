@@ -18,7 +18,7 @@ import scalatags.JsDom.all._
 class PageView(
   model: ModelProperty[PageModel],
   presenter: PagePresenter
-) extends Headers.PageView(model, presenter) with FinalView with CssView with PageUtils with TimeFormatting {
+) extends Headers.PageView(presenter) with FinalView with CssView with PageUtils with TimeFormatting {
   val s = SelectPageStyles
 
   val settings = ApplicationContext.settings

@@ -17,13 +17,28 @@ class PagePresenter(
   rpc: RestAPI
 )(implicit ec: ExecutionContext) extends Headers.PagePresenter[SettingsPageState.type](application) {
 
+  val userSettings = ApplicationContext.serverSettings
+
+  userSettings.subProp(_.timezone).streamTo(model.subProp(_.selectedTimezone))(identity)
+
+  listAllTimezones()
+
   def handleState(state: SettingsPageState.type) = {}
 
   def submit(): Future[Unit] = {
-    rpc.user(ApplicationContext.currentToken).settings(ApplicationContext.serverSettings.get)
+    rpc.user(ApplicationContext.currentToken).settings(userSettings.get).map { _ =>
+      userSettings.subProp(_.timezone).set(model.subProp(_.selectedTimezone).get)
+    }
   }
 
   def guessTimezone(): Unit = {
-    ApplicationContext.serverSettings.subProp(_.timezone).set(TimeFormatting.timezone)
+    val userTimezone = TimeFormatting.timezone
+    model.subProp(_.selectedTimezone).set(userTimezone)
+  }
+
+  def listAllTimezones() = {
+    rpc.user(ApplicationContext.currentToken).listAllTimezones.foreach { zones =>
+      model.subProp(_.timezones).set(zones)
+    }
   }
 }

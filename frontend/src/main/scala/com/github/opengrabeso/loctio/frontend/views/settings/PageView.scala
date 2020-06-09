@@ -14,11 +14,14 @@ import scala.util.Try
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
+// TODO: edit PageModel instead of the global data
 class PageView(
   model: ModelProperty[PageModel],
   presenter: PagePresenter
-) extends Headers.PageView(model, presenter) with FinalView with CssView with PageUtils with TimeFormatting {
+) extends Headers.PageView(presenter) with FinalView with CssView with PageUtils with TimeFormatting {
   val s = SelectPageStyles
+
+
   def onAdminClick() = {}
   def getTemplate = {
     val userSettings = ApplicationContext.serverSettings
@@ -46,7 +49,7 @@ class PageView(
         ":",
         NumberInput(userSettings.subProp(_.visibleMinutesTo).asString)(minuteModifiers),
         " timezone",
-        TextInput(userSettings.subProp(_.timezone))(),
+        Select(model.subProp(_.selectedTimezone), model.subSeq(_.timezones))(_.render),
         button("Autodetect timezone".toProperty).tap(buttonOnClick(_){
           presenter.guessTimezone()
         }),

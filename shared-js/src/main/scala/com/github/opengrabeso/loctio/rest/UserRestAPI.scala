@@ -21,6 +21,9 @@ trait UserRestAPI {
   @POST
   def settings(s: UserSettings): Future[Unit]
 
+  @GET
+  def listAllTimezones: Future[Seq[String]]
+
   @POST
   def listUsers(ipAddress: String, state: String): Future[Seq[(String, LocationInfo)]]
 

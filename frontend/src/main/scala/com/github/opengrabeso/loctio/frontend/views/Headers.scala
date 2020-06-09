@@ -19,7 +19,7 @@ object Headers {
     def gotoMain(): Unit = application.goTo(SelectPageState)
     def gotoPreferences() = application.goTo(SettingsPageState)
   }
-  abstract class PageView[T<: State](model: ModelProperty[PageModel], presenter: PagePresenter[T]) extends CssView with PageUtils {
+  abstract class PageView[T<: State](presenter: PagePresenter[T]) extends CssView with PageUtils {
     def onAdminClick(): Unit
 
     import scalatags.JsDom.all._

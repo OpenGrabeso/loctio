@@ -2,7 +2,6 @@ package com.github.opengrabeso.loctio
 package frontend
 package views.settings
 
-import frontend.views.PageModel
 import rest.RestAPI
 import routing._
 import io.udash._
