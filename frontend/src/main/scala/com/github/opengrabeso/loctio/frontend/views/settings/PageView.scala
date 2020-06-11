@@ -36,24 +36,32 @@ class PageView(
     div(
       prefix,
       header,
-      h1("Settings"),
+      div(
+        s.settingsContainer,
+        h1("Settings"),
 
+        hr(s.hr),
 
-      div(Flex.row(),Flex.grow0(),
-        "Available hours from ",
-        NumberInput(userSettings.subProp(_.visibleHoursFrom).asString)(hourModifiers),
-        ":",
-        NumberInput(userSettings.subProp(_.visibleMinutesFrom).asString)(minuteModifiers),
-        " to ",
-        NumberInput(userSettings.subProp(_.visibleHoursTo).asString)(hourModifiers),
-        ":",
-        NumberInput(userSettings.subProp(_.visibleMinutesTo).asString)(minuteModifiers),
-        " timezone",
-        Select(model.subProp(_.selectedTimezone), model.subSeq(_.timezones))(_.render),
-        button("Autodetect timezone".toProperty).tap(buttonOnClick(_){
-          presenter.guessTimezone()
-        }),
-        div(Flex.grow1())
+        h2("Privacy"),
+
+        div(
+          Flex.row(),Flex.grow0(),
+          "Available hours from ",
+          NumberInput(userSettings.subProp(_.visibleHoursFrom).asString)(hourModifiers),
+          ":",
+          NumberInput(userSettings.subProp(_.visibleMinutesFrom).asString)(minuteModifiers),
+          " to ",
+          NumberInput(userSettings.subProp(_.visibleHoursTo).asString)(hourModifiers),
+          ":",
+          NumberInput(userSettings.subProp(_.visibleMinutesTo).asString)(minuteModifiers),
+          " timezone",
+          Select(model.subProp(_.selectedTimezone), model.subSeq(_.timezones))(_.render),
+          button("Autodetect timezone".toProperty).tap(buttonOnClick(_){
+            presenter.guessTimezone()
+          }),
+          div(Flex.grow1())
+        ),
+        hr(),
       ),
       div(
         Flex.row(),Flex.grow0(),

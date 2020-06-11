@@ -52,6 +52,10 @@ object SelectPageStyles extends CssBase {
     height(100 %%),
   )
 
+  val hr = style(
+    width(100 %%)
+  )
+
 
   val error: CssStyle = style(
     backgroundColor.red
