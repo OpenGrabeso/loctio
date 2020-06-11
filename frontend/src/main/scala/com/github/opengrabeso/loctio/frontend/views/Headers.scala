@@ -2,8 +2,7 @@ package com.github.opengrabeso.loctio
 package frontend
 package views
 
-import com.github.opengrabeso.loctio.common.css.{GlobalStyles, SelectPageStyles}
-import com.github.opengrabeso.loctio.dataModel.SettingsModel
+import com.github.opengrabeso.loctio.common.css.GlobalStyles
 import routing._
 import io.udash._
 import io.udash.bootstrap._
@@ -18,13 +17,14 @@ import org.scalajs.dom.raw.HTMLElement
 object Headers {
   abstract class PagePresenter[T<: State](application: Application[RoutingState]) extends Presenter[T] {
     def gotoMain(): Unit = application.goTo(SelectPageState)
+    def gotoPreferences() = application.goTo(SettingsPageState)
   }
-  abstract class PageView[T<: State](model: ModelProperty[PageModel], presenter: PagePresenter[T]) extends CssView with PageUtils {
+  abstract class PageView[T<: State](presenter: PagePresenter[T]) extends CssView with PageUtils {
     def onAdminClick(): Unit
 
     import scalatags.JsDom.all._
 
-    protected def globals = model.subModel(_.settings)
+    protected val globals = ApplicationContext.settings
 
     private val settingsToken = Property[String]("")
     private val settingsOkButton = UdashButton(
@@ -54,7 +54,8 @@ object Headers {
     )
 
     private val settingsButton = button("Log in".toProperty)
-    private val adminButton = faIconButton("cogs", " Site administration".toProperty)
+    private val preferencesButton = faIconButton("cog", "Settings".toProperty)
+    private val adminButton = faIconButton("cogs", "Site administration".toProperty)
 
     buttonOnClick(settingsButton) {
       settingsToken.set("")
@@ -64,6 +65,10 @@ object Headers {
     buttonOnClick(adminButton) {
       onAdminClick()
     }
+    buttonOnClick(preferencesButton) {
+      presenter.gotoPreferences()
+    }
+
     val prefix = Seq[Modifier](
       // loads Bootstrap and FontAwesome styles from CDN
       UdashBootstrap.loadBootstrapStyles(),
@@ -102,6 +107,7 @@ object Headers {
           ),
         ),
         div(Flex.grow1()),
+        td(preferencesButton).render,
         showIf(globals.subProp(_.role).transform(_ == "admin")) (
           Seq[Node](
             td(adminButton).render

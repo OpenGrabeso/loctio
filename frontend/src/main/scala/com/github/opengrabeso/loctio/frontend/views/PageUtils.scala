@@ -53,7 +53,7 @@ trait PageUtils extends common.Formatting with CssView {
     color: Color = Color.Light, disabled: ReadableProperty[Boolean] = false.toProperty
   ): UdashButton = {
     UdashButton(disabled = disabled, buttonStyle = color.toProperty) { _ => Seq[Modifier](
-      i(cls := "fas fa-" + name), bind(buttonText)
+      i(cls := "fas fa-" + name), " ", bind(buttonText)
     )}
   }
 }

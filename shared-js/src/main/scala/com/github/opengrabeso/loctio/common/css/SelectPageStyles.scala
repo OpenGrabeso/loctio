@@ -1,6 +1,7 @@
 package com.github.opengrabeso.loctio.common.css
 
 import io.udash.css._
+import scalatags.generic.Attr
 
 import scala.language.postfixOps
 
@@ -49,6 +50,10 @@ object SelectPageStyles extends CssBase {
     margin.auto,
     containerBorder,
     height(100 %%),
+  )
+
+  val hr = style(
+    width(100 %%)
   )
 
 

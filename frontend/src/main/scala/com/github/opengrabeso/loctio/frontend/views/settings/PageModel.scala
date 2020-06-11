@@ -1,16 +1,14 @@
 package com.github.opengrabeso.loctio
 package frontend.views
+package settings
 
-import common.model.UserRow
 import io.udash._
 
 /** The form's model structure. */
 case class PageModel(
   loading: Boolean,
-  debug: String = null,
-  users: Seq[UserRow] = Seq.empty,
-  allUsers: Seq[String] = Seq.empty,
-  error: Option[Throwable] = None
+  timezones: Seq[String] = Seq.empty,
+  selectedTimezone: String = ""
 )
 
 object PageModel extends HasModelPropertyCreator[PageModel]

@@ -22,7 +22,7 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future, Promise, duration}
 import scala.swing._
 import scala.swing.Swing._
-import shared.ChainingSyntax._
+import common.ChainingSyntax._
 
 import scala.concurrent.ExecutionContext.global
 import shared.FutureAt._
