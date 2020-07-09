@@ -27,10 +27,16 @@ class HtmlPanel(baseUri: String) extends Panel {
     }
   }
 
-  def html: String = throw new UnsupportedOperationException("HTML document is write only")
+  private var htmlValue: String = ""
+
+  def html: String = htmlValue
   def html_=(text: String): Unit = {
-    val is = new ByteArrayInputStream(text.getBytes(Charset.forName("UTF-8")))
-    val url = baseUri
-    peer.setDocument(is, url + "/")
+    // avoid loading the document unless necessary, as loading is quite slow
+    if (htmlValue != text) {
+      htmlValue = text
+      val is = new ByteArrayInputStream(text.getBytes(Charset.forName("UTF-8")))
+      val url = baseUri
+      peer.setDocument(is, url + "/")
+    }
   }
 }

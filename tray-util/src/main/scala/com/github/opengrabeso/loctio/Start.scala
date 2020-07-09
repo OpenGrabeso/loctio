@@ -428,7 +428,10 @@ object Start extends SimpleSwingApplication {
       assert(SwingUtilities.isEventDispatchThread)
       state = s
       val text = if (state.isEmpty) appName else state
-      icon.setToolTip(text)
+      // setting tooltip is a system call, it might be quite slow, avoid it unless necessary
+      if (text != icon.getToolTip) {
+        icon.setToolTip(text)
+      }
     }
   }
 
