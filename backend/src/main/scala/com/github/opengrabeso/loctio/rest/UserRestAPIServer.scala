@@ -669,6 +669,10 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           val nextAfter = response.headers.xPollInterval.map(_.toInt).getOrElse(60)
           Success(notificationsTable, notifyUser, nextAfter)
         case Failure(github.rest.DataWithHeaders.HttpErrorExceptionWithHeaders(ex, headers)) =>
+
+          if (ex.code != 304 ) {
+            println(s"HTTP error code ${ex.code} cause ${ex.payload.getOrElse("")}")
+          }
           val nextAfter = headers.xPollInterval.map(_.toInt).getOrElse(60)
 
           for (s <- recentSession) { // update the session info to keep alive (prevent resetting)
