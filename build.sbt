@@ -22,7 +22,7 @@ lazy val flyingSaucersSettings = Seq(
   libraryDependencies += "org.xhtmlrenderer" % "flying-saucer-core" % "9.1.20-opengrabeso.4"
 )
 
-val udashVersion = "0.8.2"
+val udashVersion = "0.8.6"
 
 val bootstrapVersion = "4.3.1"
 
