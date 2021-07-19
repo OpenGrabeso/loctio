@@ -1,8 +1,6 @@
 package com.github.opengrabeso.loctio
 package requests
 
-import spark.{Request, Response}
-
 object UdashApp  extends DefineRequest("/app") {
   def html(request: Request, resp: Response) = {
     <html>

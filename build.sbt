@@ -132,25 +132,41 @@ lazy val frontend = project.settings(
     .dependsOn(sharedJs_JS)
 
 lazy val backend = (project in file("backend"))
-  .disablePlugins(sbtassembly.AssemblyPlugin)
+  .enablePlugins(sbtassembly.AssemblyPlugin)
   .dependsOn(shared, sharedJs_JVM)
   .settings(
     addJavaScriptToServerResources(),
     addJSDependenciesToServerResources(),
 
-    resourceGenerators in Compile += Def.task {
-      val file = (resourceManaged in Compile).value / "config.properties"
-      val contents = s"devMode=${inDevMode}"
-      IO.write(file, contents)
-      Seq(file)
+    Compile / resourceGenerators += Def.task {
+      import Path._
+      val configFile = (Compile / resourceManaged).value / "config.properties"
+      IO.write(configFile, s"devMode=$inDevMode\ndummy=false")
+
+      // from https://stackoverflow.com/a/57994298/16673
+      val staticDir = baseDirectory.value / "web" / "static"
+      val staticFiles = (staticDir ** "*.*").get()
+      val pairs = staticFiles pair rebase(staticDir, (Compile / resourceManaged).value / "static")
+
+      IO.copy(pairs)
+
+      configFile +: pairs.map(_._2)
     }.taskValue,
 
     commonSettings,
     flyingSaucersSettings,
 
     libraryDependencies ++= commonLibs ++ jvmLibs ++ Seq(
-      "com.google.appengine.tools" % "appengine-gcs-client" % "0.8" exclude("javax.servlet", "servlet.api"),
-      "com.google.cloud" % "google-cloud-storage" % "1.96.0",
+      "com.google.http-client" % "google-http-client-appengine" % "1.39.0",
+      "com.google.http-client" % "google-http-client-jackson2" % "1.39.0",
+      "com.google.apis" % "google-api-services-storage" % "v1-rev171-1.25.0",
+
+      "org.eclipse.jetty" % "jetty-server" % "9.4.31.v20200723",
+      "org.eclipse.jetty" % "jetty-servlet" % "9.4.31.v20200723",
+
+      "com.google.appengine.tools" % "appengine-gcs-client" % "0.8.1" exclude("javax.servlet", "servlet.api"),
+      "com.google.cloud" % "google-cloud-storage" % "1.118.0",
+      "com.google.cloud" % "google-cloud-tasks" % "1.33.2",
 
       "com.fasterxml.jackson.core" % "jackson-core" % jacksonVersion,
       "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion,
@@ -160,23 +176,33 @@ lazy val backend = (project in file("backend"))
 
       //"org.webjars" % "webjars-locator-core" % "0.39",
 
-      "com.sparkjava" % "spark-core" % "1.1.1" excludeAll ExclusionRule(organization = "org.eclipse.jetty"),
       "org.slf4j" % "slf4j-simple" % "1.6.1",
       "com.jsuereth" %% "scala-arm" % "2.0" exclude(
         "org.scala-lang.plugins", "scala-continuations-library_" + scalaBinaryVersion.value
       ),
       "org.apache.commons" % "commons-math" % "2.1",
       "commons-io" % "commons-io" % "2.1"
-    )
-  )
+    ),
 
-lazy val jetty = (project in file("jetty")).dependsOn(backend).settings(
-  libraryDependencies ++= Seq(
-    // "javax.servlet" % "javax.servlet-api" % "4.0.1", // version 3.1.0 provided by the jetty-server should be fine
-    "org.eclipse.jetty" % "jetty-server" % "9.3.18.v20170406"
-  ),
-  resolverSettings
-)
+    assembly / assemblyMergeStrategy := {
+      case PathList("META-INF", "MANIFEST.MF") =>
+        MergeStrategy.discard
+      case PathList(ps @ _*) if ps.nonEmpty && Seq("io.netty.versions.properties", "module-info.class", "nowarn$.class", "nowarn.class").contains(ps.last) =>
+        MergeStrategy.first
+      case PathList("javax", "servlet", _*) =>
+        MergeStrategy.first
+      case PathList("META-INF", ps @ _*) if ps.nonEmpty && Seq("native-image.properties", "reflection-config.json").contains(ps.last) =>
+        MergeStrategy.first
+      case x =>
+        // default handling for things like INDEX.LIST (see https://stackoverflow.com/a/46287790/16673)
+        val oldStrategy = (assembly / assemblyMergeStrategy).value
+        oldStrategy(x)
+    },
+
+    assembly / assemblyJarName := "loctio.jar",
+    assembly / mainClass := Some("com.github.opengrabeso.loctio.DevServer")
+
+  )
 
 lazy val root = (project in file(".")).aggregate(backend).settings(
   name := "Loctio",

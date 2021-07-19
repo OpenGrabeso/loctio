@@ -2,7 +2,6 @@ package com.github.opengrabeso.loctio
 package requests
 
 import com.github.opengrabeso.loctio.common.FileStore
-import spark.{Request, Response}
 
 import scala.reflect.ClassTag
 

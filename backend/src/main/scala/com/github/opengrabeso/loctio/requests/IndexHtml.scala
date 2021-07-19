@@ -1,8 +1,6 @@
 package com.github.opengrabeso.loctio
 package requests
 
-import spark.{Request, Response}
-
 object IndexHtml extends DefineRequest("/") {
 
   def html(request: Request, resp: Response) = {

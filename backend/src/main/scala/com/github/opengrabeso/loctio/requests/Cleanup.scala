@@ -1,7 +1,6 @@
 package com.github.opengrabeso.loctio
 package requests
 import com.google.appengine.api.taskqueue.{DeferredTask, QueueFactory, TaskOptions}
-import spark.{Request, Response}
 import java.time.ZonedDateTime
 
 /**
@@ -10,8 +9,8 @@ import java.time.ZonedDateTime
 object Cleanup extends DefineRequest("/cleanup") {
 
   @SerialVersionUID(10L)
-  case object BackgroundCleanup extends DeferredTask {
-    override def run(): Unit = {
+  case object BackgroundCleanup extends BackgroundTasks.TaskDescription[String] {
+    override def execute(dummy: String): Unit = {
       // catch all exceptions, because otherwise the task would be repeated on a failure
       // as the task is periodic, this is not necessary - moreover the failure is most likely
       // caused by a bug and would happen again
@@ -23,6 +22,7 @@ object Cleanup extends DefineRequest("/cleanup") {
           println(s"Exception $ex during cleanup")
       }
     }
+    override def path = "/rest/cleanup"
   }
 
 
@@ -30,7 +30,7 @@ object Cleanup extends DefineRequest("/cleanup") {
     val periodic = request.queryParams("periodic")
     if (periodic != null) {
 
-      BackgroundTasks.addTask(BackgroundCleanup)
+      BackgroundTasks.addTask(BackgroundCleanup, periodic, System.currentTimeMillis())
 
       <cleaned><deferred>Background request initiated</deferred></cleaned>
     } else {

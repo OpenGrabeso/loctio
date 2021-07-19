@@ -1,6 +1,14 @@
 package com.github.opengrabeso.loctio
 
-import spark.{Request, Response, Session}
+import java.net.{URLDecoder, URLEncoder}
+import Main._
+
+import javax.servlet.{ServletRequest, ServletResponse}
+import scala.util.Try
+import scala.xml.NodeSeq
+import ServletUtils._
+
+import java.nio.charset.StandardCharsets
 
 import scala.xml.NodeSeq
 
@@ -19,33 +27,44 @@ object DefineRequest {
   abstract class Post(handleUri: String) extends DefineRequest(handleUri, method = Method.Post)
 }
 
-abstract class DefineRequest(val handleUri: String, val method: Method = Method.Get) {
+abstract class DefineRequest(val handleUri: String, val method: Method = Method.Get) extends ServletUtils {
+  type Request = ServletRequest
+  type Response = ServletResponse
+
+  def uriRest(request: ServletRequest): String = {
+    val uri = request.url
+    if (handleUri.endsWith("*")) {
+      val prefix = handleUri.dropRight(1)
+      assert(uri.startsWith(prefix))
+      uri.drop(prefix.length)
+    } else {
+      throw new UnsupportedOperationException(s"Cannot get URI rest by pattern $handleUri")
+    }
+
+  }
 
   // some actions (logout) may have their URL prefixed to provide a specific functionality
 
-  def apply(request: Request, resp: Response): AnyRef = {
+  def handle(request: Request, resp: Response): Unit = {
 
-    import com.google.appengine.api.utils.SystemProperty
-
-    if (SystemProperty.environment.value() == SystemProperty.Environment.Value.Development) {
-      // logging on production server is counter-productive, logs are already sorted by request
-      println(s"Request ${request.url()}")
-    }
     val nodes = html(request, resp)
     if (nodes.nonEmpty) {
-      val docType = """<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd" >"""
       nodes.head match {
         case <html>{_*}</html> =>
-          docType + nodes.toString
-        case xml.Unparsed(content) if content.trim.startsWith("<html>") =>
-          docType + content
+          val docType = """<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd" >"""
+          val body = docType + nodes.toString
+          resp.`type`("text/html")
+          resp.getOutputStream.write(body.getBytes(StandardCharsets.UTF_8))
         case _ =>
-          resp.`type`("text/xml; charset=utf-8")
+          resp.setContentType("text/xml; charset=utf-8")
           val xmlPrefix = """<?xml version="1.0" encoding="UTF-8"?>""" + "\n"
-          xmlPrefix + nodes.toString
+          val body = xmlPrefix + nodes.toString
+          resp.getOutputStream.write(body.getBytes(StandardCharsets.UTF_8))
+          resp.`type`("text/xml")
       }
-    } else resp
+    }
   }
+
 
   def html(request: Request, resp: Response): NodeSeq
 
