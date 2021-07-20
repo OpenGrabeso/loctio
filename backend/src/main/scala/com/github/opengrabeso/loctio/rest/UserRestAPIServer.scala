@@ -328,7 +328,8 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
     val sttpBackend = new SttpBackendAsyncWrapper(HttpURLConnectionBackend())(executeNow)
     try {
 
-      val gitHubAPI = new GitHubAPIClient(sttpBackend)
+      val gitHubAPI = new GitHubAPIClient[github.rest.RestAPI](sttpBackend, "https://api.github.com")
+      val gitHubStatusAPI = new GitHubAPIClient[github.rest.status.GitHubStatusAPI](sttpBackend, "https://www.githubstatus.com/api/v2")
 
       val session = storage.load[TraySession](sessionFilename)
       val now = ZonedDateTime.now()
@@ -342,7 +343,37 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
       val ifModifiedSince = recentSession.flatMap(_.lastModified).orNull
 
+      val statusMessageFuture = gitHubStatusAPI.api.status.at(executeNow).transform {
+        case Success(status) =>
+          Success {
+            Some {
+              b(
+                a(
+                  href := "https://www.githubstatus.com/",
+                  "GitHub Status"
+                ),
+                s" is up (${status.status.description})"
+              )
+            }
+          }
+        case Failure(ex) =>
+          Success {
+            Some {
+              b(
+                a(
+                  href := "https://www.githubstatus.com/",
+                  "GitHub Status"
+                ),
+                s" is down ($ex)"
+              )
+            }
+          }
+      }
       //println(s"notifications.get ${userAuth.login}: since $ifModifiedSince")
+      // we expect status to return very quickly
+      val statusMessageResult = Await.result(statusMessageFuture, Duration(10, SECONDS))
+
+      // TODO: with Java 11 we might be able to use real futures?
 
       val api = gitHubAPI.api.authorized("Bearer " + userAuth.token)
       val r = api.notifications.get(
@@ -630,6 +661,9 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                 a(href := "https://www.github.com/notifications", "GitHub notifications")
               ),
               div(
+                statusMessageResult
+              ),
+              div(
                 cls := "notification table",
                 raw(unread.map("<div class='notification item'>" + notificationHTML(_, comments, infos) + "</div>").mkString)
               )
@@ -695,21 +729,23 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
           val errorMessage = ex.payload.toOption.filter(_.nonEmpty).map(payload => s": $payload").getOrElse("")
 
-          val errorReport = html(
-            head(
-              link(href := "static/tray.css", rel := "stylesheet"),
-              link(href := "rest/issues.css", rel := "stylesheet"),
-            ),
-            body(
-              cls := "notifications",
-              p(
-                b(s"GitHub Error ${ex.code}"),
-                errorMessage
+          val errorReport = if (ex.code != 304) {
+            // TODO: display notification (on first error only)
+            html(
+              head(
+                link(href := "static/tray.css", rel := "stylesheet"),
+                link(href := "rest/issues.css", rel := "stylesheet"),
+              ),
+              body(
+                cls := "notifications",
+                p(
+                  b(s"GitHub Error ${ex.code}"),
+                  errorMessage
+                )
               )
-            )
-          ).render
+            ).render
+          } else ""
 
-          // TODO: display notification (on first error only)
           Success(errorReport, Seq.empty, nextAfter)
         case Failure(ex) =>
           Failure(ex)

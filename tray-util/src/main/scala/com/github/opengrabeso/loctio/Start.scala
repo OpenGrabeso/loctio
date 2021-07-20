@@ -104,7 +104,9 @@ object Start extends SimpleSwingApplication {
     Future.failed(throw new NoSuchElementException("No token provided"))
   }
 
-  object gitHubAPIClient extends GitHubAPIClient(SttpRestClient.defaultBackend())
+  import com.github.opengrabeso.github
+  object gitHubAPIClient extends GitHubAPIClient[github.rest.RestAPI](SttpRestClient.defaultBackend(), "https://api.github.com")
+
   def githubApi(token: String): AuthorizedAPI = gitHubAPIClient.api.authorized("Bearer " + cfg.token)
 
   def login() = {
