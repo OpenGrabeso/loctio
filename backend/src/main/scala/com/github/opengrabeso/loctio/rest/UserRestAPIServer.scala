@@ -346,15 +346,15 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
       val statusMessageFuture = gitHubStatusAPI.api.status.at(executeNow).transform {
         case Success(status) =>
           Success {
-            Some {
-              b(
-                a(
-                  href := "https://www.githubstatus.com/",
-                  "GitHub Status"
-                ),
-                s" is up (${status.status.description})"
-              )
-            }
+            if (status.status.indicator != "none") {
+              Some {
+                p(
+                  a(href := "https://www.githubstatus.com/", "GitHub Status"),
+                  ": ",
+                  b(status.status.description)
+                )
+              }
+            } else None
           }
         case Failure(ex) =>
           Success {
