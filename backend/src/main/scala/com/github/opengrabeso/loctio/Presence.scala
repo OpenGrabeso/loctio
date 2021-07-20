@@ -13,7 +13,7 @@ object Presence {
   def pathWatching(login: String, user: String) = s"contacts/$login/watching/$user"
   def pathWatchedBy(login: String, user: String) = s"contacts/$login/watched-by/$user"
 
-  def b(boolean: Boolean) = new java.lang.Boolean(boolean)
+  def b(boolean: Boolean) = java.lang.Boolean.valueOf(boolean)
 
   def requestWatching(login: String, user: String) = {
     Storage.store(FullName(pathWatching(login, user)), b(false)) // value has no meaning
