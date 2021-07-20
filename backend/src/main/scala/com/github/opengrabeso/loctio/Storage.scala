@@ -83,10 +83,12 @@ object Storage extends common.FileStore {
     try {
       val ois = new ObjectInputStream(is)
       readSingleObject[T](ois)
+    } catch {
+      case ex: IOException =>
+        None
     } finally {
       is.close()
     }
-
   }
 
   def load[T : ClassTag](fullName: FullName): Option[T] = {
@@ -110,6 +112,8 @@ object Storage extends common.FileStore {
       case _: java.io.EOFException =>
         println(s"Short (most likely empty) file $fullName")
         None
+      //case ex: java.io.IOException =>
+
       case x: Exception =>
         x.printStackTrace()
         None

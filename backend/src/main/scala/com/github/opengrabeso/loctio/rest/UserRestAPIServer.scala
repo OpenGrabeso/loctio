@@ -675,11 +675,42 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           }
           val nextAfter = headers.xPollInterval.map(_.toInt).getOrElse(60)
 
-          for (s <- recentSession) { // update the session info to keep alive (prevent resetting)
-            storage.store(sessionFilename, s.copy(lastPoll = now))
+          val newSession = recentSession.map {
+            _.copy(lastPoll = now)
+          }.getOrElse {
+            // we need to store something, but there is no session recorded and GitHub returned an error
+            // create some empty placeholder
+            TraySession(
+              sessionStarted = now,
+              lastModified = None,
+              lastPoll = now,
+              currentMesages = Nil,
+              lastComments = Map.empty,
+              info = Map.empty,
+              mostRecentNotified = None
+            )
           }
+          // update the session info to keep alive (prevent resetting)
+          storage.store(sessionFilename, newSession)
 
-          Success("", Seq.empty, nextAfter)
+          val errorMessage = ex.payload.toOption.filter(_.nonEmpty).map(payload => s": $payload").getOrElse("")
+
+          val errorReport = html(
+            head(
+              link(href := "static/tray.css", rel := "stylesheet"),
+              link(href := "rest/issues.css", rel := "stylesheet"),
+            ),
+            body(
+              cls := "notifications",
+              p(
+                b(s"GitHub Error ${ex.code}"),
+                errorMessage
+              )
+            )
+          ).render
+
+          // TODO: display notification (on first error only)
+          Success(errorReport, Seq.empty, nextAfter)
         case Failure(ex) =>
           Failure(ex)
       }
