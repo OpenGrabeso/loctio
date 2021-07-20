@@ -68,10 +68,11 @@ object UserRestAPIServer {
     sessionStarted: ZonedDateTime, // used to decide when should be flush (reset) the session to perform a full update
     lastModified: Option[String], // lastModified HTTP headers used for notifications optimization
     lastPoll: ZonedDateTime, // last time when the user has polled notifications
-    currentMesages: Seq[Notification],
-    lastComments: Map[String, Seq[NotificationContent]], // we use URL for identification, as this is sure to be stable for an issue
-    info: Map[String, String], // HTML used to display the info
-    mostRecentNotified: Option[ZonedDateTime] // most recent notification display to the user
+    currentMesages: Seq[Notification] = Seq.empty,
+    lastComments: Map[String, Seq[NotificationContent]] = Map.empty, // we use URL for identification, as this is sure to be stable for an issue
+    info: Map[String, String] = Map.empty, // HTML used to display the info
+    mostRecentNotified: Option[ZonedDateTime] = None,
+    gitHubStatusReported: String = "none" // most recent github status displayed to the user
   )
 
 }
@@ -324,7 +325,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
     trayNotificationsHTMLImpl(Storage)
   }
 
-  def trayNotificationsHTMLImpl(storage: common.FileStore) = {
+  def trayNotificationsHTMLImpl(storage: common.FileStore): (String, Seq[String], Int) = {
     val sttpBackend = new SttpBackendAsyncWrapper(HttpURLConnectionBackend())(executeNow)
     try {
 
@@ -343,35 +344,44 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
       val ifModifiedSince = recentSession.flatMap(_.lastModified).orNull
 
-      val statusMessageFuture = gitHubStatusAPI.api.status.at(executeNow).transform {
-        case Success(status) =>
-          Success {
-            if (status.status.indicator != "none") {
-              Some {
-                p(
-                  a(href := "https://www.githubstatus.com/", "GitHub Status"),
-                  ": ",
-                  b(status.status.description)
-                )
-              }
-            } else None
-          }
-        case Failure(ex) =>
-          Success {
+      val statusMessageFuture = gitHubStatusAPI.api.status
+      //println(s"notifications.get ${userAuth.login}: since $ifModifiedSince")
+      // we expect status to return very quickly
+      val statusMessageResult = Try(Await.result(statusMessageFuture, Duration(10, SECONDS)))
+      val statusMessageToReport = statusMessageResult.toOption.map(_.status.indicator).getOrElse("exception")
+
+      val statusMessageText = if (session.map(_.gitHubStatusReported).getOrElse("none") != statusMessageToReport) {
+        statusMessageResult match {
+          case Success(status) =>
             Some {
-              b(
+              p(
+                a(href := "https://www.githubstatus.com/", "GitHub Status"),
+                ": ",
+                b(status.status.description)
+              )
+            }
+          case Failure(ex) =>
+            Some {
+              p(
                 a(
                   href := "https://www.githubstatus.com/",
                   "GitHub Status"
                 ),
-                s" is down ($ex)"
+                b(s" is down ($ex)")
               )
             }
-          }
-      }
-      //println(s"notifications.get ${userAuth.login}: since $ifModifiedSince")
-      // we expect status to return very quickly
-      val statusMessageResult = Await.result(statusMessageFuture, Duration(10, SECONDS))
+        }
+      } else None
+
+      val statusMessageNotification = if (session.map(_.gitHubStatusReported).getOrElse("none") != statusMessageToReport) {
+        println(s"Github status notification: $statusMessageToReport")
+        statusMessageResult match {
+          case Success(s) =>
+            Some(s"GitHub: ${s.status.description}")
+          case Failure(ex) =>
+            Some("githubstatus.com is down")
+        }
+      } else None
 
       // TODO: with Java 11 we might be able to use real futures?
 
@@ -661,7 +671,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                 a(href := "https://www.github.com/notifications", "GitHub notifications")
               ),
               div(
-                statusMessageResult
+                statusMessageText
               ),
               div(
                 cls := "notification table",
@@ -696,12 +706,13 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
             unread,
             comments,
             infos,
-            newMostRecentNotified
+            newMostRecentNotified,
+            gitHubStatusReported = statusMessageToReport
           )
           storage.store(sessionFilename, newSession)
 
           val nextAfter = response.headers.xPollInterval.map(_.toInt).getOrElse(60)
-          Success(notificationsTable, notifyUser, nextAfter)
+          Success(notificationsTable, notifyUser ++ statusMessageNotification, nextAfter)
         case Failure(github.rest.DataWithHeaders.HttpErrorExceptionWithHeaders(ex, headers)) =>
 
           if (ex.code != 304 ) {
@@ -710,7 +721,10 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           val nextAfter = headers.xPollInterval.map(_.toInt).getOrElse(60)
 
           val newSession = recentSession.map {
-            _.copy(lastPoll = now)
+            _.copy(
+              lastPoll = now,
+              gitHubStatusReported = statusMessageToReport
+            )
           }.getOrElse {
             // we need to store something, but there is no session recorded and GitHub returned an error
             // create some empty placeholder
@@ -718,10 +732,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               sessionStarted = now,
               lastModified = None,
               lastPoll = now,
-              currentMesages = Nil,
-              lastComments = Map.empty,
-              info = Map.empty,
-              mostRecentNotified = None
+              gitHubStatusReported = statusMessageToReport
             )
           }
           // update the session info to keep alive (prevent resetting)
@@ -746,7 +757,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
             ).render
           } else ""
 
-          Success(errorReport, Seq.empty, nextAfter)
+          Success(errorReport, statusMessageNotification.toSeq, nextAfter)
         case Failure(ex) =>
           Failure(ex)
       }
