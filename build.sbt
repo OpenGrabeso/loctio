@@ -103,11 +103,11 @@ lazy val trayUtil = (project in file("tray-util"))
     libraryDependencies += "org.scala-lang.modules" %% "scala-swing" % "2.1.1",
     libraryDependencies += "net.java.dev.jna" % "jna" % "5.5.0",
     libraryDependencies ++= commonLibs ++ jvmLibs,
-    assemblyJarName in assembly := "loctio-tray.jar",
-    assemblyMergeStrategy in assembly := {
+    assembly / assemblyJarName := "loctio-tray.jar",
+    assembly / assemblyMergeStrategy := {
       case x if x.contains("io.netty.versions.properties") => MergeStrategy.discard
       case x =>
-        val oldStrategy = (assemblyMergeStrategy in assembly).value
+        val oldStrategy = (assembly / assemblyMergeStrategy).value
         oldStrategy(x)
     }
   )
@@ -116,12 +116,12 @@ def inDevMode = true || sys.props.get("dev.mode").exists(value => value.equalsIg
 
 def addJavaScriptToServerResources(): Def.SettingsDefinition = {
   val optJs = if (inDevMode) fastOptJS else fullOptJS
-  (resources in Compile) += (optJs in(frontend, Compile)).value.data
+  (Compile / resources) += (frontend / Compile / optJs).value.data
 }
 
 def addJSDependenciesToServerResources(): Def.SettingsDefinition = {
   val depJs = if (inDevMode) packageJSDependencies else packageMinifiedJSDependencies
-  (resources in Compile) += (depJs in(frontend, Compile)).value
+  (Compile / resources) += (frontend / Compile / depJs).value
 }
 
 lazy val frontend = project.settings(
