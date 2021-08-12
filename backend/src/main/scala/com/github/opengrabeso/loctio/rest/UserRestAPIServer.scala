@@ -350,7 +350,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
       val statusMessageResult = Try(Await.result(statusMessageFuture, Duration(10, SECONDS)))
       val statusMessageToReport = statusMessageResult.toOption.map(_.status.indicator).getOrElse("exception")
 
-      val statusMessageText = if (session.map(_.gitHubStatusReported).getOrElse("none") != statusMessageToReport) {
+      val statusMessageText = if (statusMessageToReport != "none") {
         statusMessageResult match {
           case Success(status) =>
             Some {
