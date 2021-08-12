@@ -385,6 +385,8 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
       // TODO: with Java 11 we might be able to use real futures?
 
+      println(s"Request ${userAuth.login}: since $ifModifiedSince")
+
       val api = gitHubAPI.api.authorized("Bearer " + userAuth.token)
       val r = api.notifications.get(
         ifModifiedSince,
@@ -406,7 +408,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           val unread = newUnread ++ keepUnread
           val unreadIds = unread.map(_.id).toSet
 
-          println(s"${userAuth.login}: since $ifModifiedSince new: ${newUnread.size}, read: ${read.size}, unread: ${unread.size}")
+          println(s"${userAuth.login}: since $ifModifiedSince / last-mod ${response.headers.lastModified} new: ${newUnread.size}, read: ${read.size}, unread: ${unread.size}")
           // download last comments for the new content
 
           def issueUrl(n: Notification, issue: Issue): String = {
@@ -759,6 +761,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
           Success(errorReport, statusMessageNotification.toSeq, nextAfter)
         case Failure(ex) =>
+          println(s"Failure $ex")
           Failure(ex)
       }
       // it would be nice to pass Future directly, but somehow it does not work - probably some Google App Engine limitation
