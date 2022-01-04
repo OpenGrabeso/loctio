@@ -64,6 +64,25 @@ object UserRestAPIServer {
       """
   }
 
+  /** event contains a specific message */
+
+  case class SpecificEventContent(
+    linkUrl: String,
+    linkText: String,
+    event: String,
+    author: String,
+    time: ZonedDateTime
+  ) extends NotificationContent {
+    override def htmlResult =
+      s"""
+      <div class="notification signature">
+      <span class="message link"> <a href="$linkUrl">$linkText</a> </span>
+      <span class="message by">$author</span>
+      $event <span class="message time"><time>$time</time></span>
+      </div>
+      """
+  }
+
   case class TraySession(
     sessionStarted: ZonedDateTime, // used to decide when should be flush (reset) the session to perform a full update
     lastModified: Option[String], // lastModified HTTP headers used for notifications optimization
@@ -72,6 +91,7 @@ object UserRestAPIServer {
     lastComments: Map[String, Seq[NotificationContent]] = Map.empty, // we use URL for identification, as this is sure to be stable for an issue
     info: Map[String, String] = Map.empty, // HTML used to display the info
     mostRecentNotified: Option[ZonedDateTime] = None,
+    reviews: Seq[Pull] = Seq.empty, // list of PRs to be reviewed by the user (or his team)
     gitHubStatusReported: String = "none" // most recent github status displayed to the user
   )
 
@@ -385,6 +405,14 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
       // TODO: with Java 11 we might be able to use real futures?
 
+      if (ifModifiedSince.isEmpty) {
+        // get list of PRs, check which of them require a review
+        api.repos()
+        val issueResponse = if (n.subject.`type` == "PullRequest") Try(gitHubAPI.request[Pull](n.subject.url, userAuth.token).awaitNow).toOption
+
+
+      }
+
       println(s"Request ${userAuth.login}: since $ifModifiedSince")
 
       val api = gitHubAPI.api.authorized("Bearer " + userAuth.token)
@@ -411,11 +439,12 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           println(s"${userAuth.login}: since $ifModifiedSince / last-mod ${response.headers.lastModified} new: ${newUnread.size}, read: ${read.size}, unread: ${unread.size}")
           // download last comments for the new content
 
-          def issueUrl(n: Notification, issue: Issue): String = {
-            s"https://www.github.com/${n.repository.full_name}/issues/${issue.number}"
+          def issueUrl(n: Notification, issue: IssueOrPull): String = {
+            val selector = if (issue.isInstanceOf[Pull]) "pull" else "issues"
+            s"https://www.github.com/${n.repository.full_name}/$selector/${issue.number}"
           }
 
-          def issueTitle(issue: Issue): String = {
+          def issueTitle(issue: IssueOrPull): String = {
             s"#${issue.number}"
           }
 
@@ -464,7 +493,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
              """ + (if (message.nonEmpty) s"""<div class="notification body">$message</div>""" else "")
           }
 
-          def buildIssueNotificationHeader(n: Notification, i: Issue): String = {
+          def buildIssueNotificationHeader(n: Notification, i: IssueOrPull): String = {
 
 
             val icon = i.state match {
@@ -483,7 +512,8 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               import github.rest.EnhancedRestImplicits._
 
               // if there is a comment, the only reason why we need to get the issue is to get its number (we need it for the link)
-              val issueResponse = Try(gitHubAPI.request[Issue](n.subject.url, userAuth.token).awaitNow).toOption
+              val issueResponse = if (n.subject.`type` == "PullRequest") Try(gitHubAPI.request[Pull](n.subject.url, userAuth.token).awaitNow).toOption
+              else Try(gitHubAPI.request[Issue](n.subject.url, userAuth.token).awaitNow).toOption
               //val since = response.headers.lastModified.map(ZonedDateTime.parse(_, DateTimeFormatter.RFC_1123_DATE_TIME))
               for (issue <- issueResponse) yield {
                 println(s"issue ${n.repository.full_name} ${issue.number}")
@@ -510,11 +540,14 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                   cs.zipWithIndex.map { case (c, index) => buildCommentData(c, cs.size - index) }
                 }
                 def buildEventData(c: Event) = {
-                  EventContent(
-                    prefix,
-                    issueTitle(issue),
-                    c.event, c.actor.login, c.created_at
-                  )
+                  c.event match {
+                    case "review_requested" =>
+                      SpecificEventContent(prefix, issueTitle(issue), "requested review at", c.actor.login, c.created_at)
+                    case "review_request_removed" =>
+                      SpecificEventContent(prefix, issueTitle(issue), "removed review request at", c.actor.login, c.created_at)
+                    case e =>
+                      EventContent(prefix, issueTitle(issue), e, c.actor.login, c.created_at)
+                  }
                 }
                 def buildEventDataSeq(es: Seq[Event]) = {
                   es.map(buildEventData)
@@ -594,6 +627,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                 )),
                 None
               )
+
             case n if n.subject.`type` == "CheckSuite" =>
               val ExtractBranch = "(.*)( workflow .* for )([^ ]+)( branch.*)".r
               n.subject.title match {
