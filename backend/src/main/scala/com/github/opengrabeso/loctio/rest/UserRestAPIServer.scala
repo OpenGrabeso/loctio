@@ -346,6 +346,70 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
   }
 
   def trayNotificationsHTMLImpl(storage: common.FileStore): (String, Seq[String], Int) = {
+
+
+    def issueLink(issue: IssueOrPull): String = {
+      val icon = issue.state match {
+        case "closed" => issueStateIcon("issue-closed")
+        case "open" => issueStateIcon("issue-opened")
+        case _ => ""
+      }
+
+      s"""$icon<a href="${issue.html_url}">${issueTitle(issue)}</a> """
+    }
+
+    def issueTitle(issue: IssueOrPull): String = {
+      s"#${issue.number}"
+    }
+
+    def shaUrl(repo: Repository, sha: String) = s"""https://github.com/${repo.full_name}/commit/$sha"""
+
+    def shaLink(repo: Repository, branch: String, sha: String) = {
+      s"""<a href="${shaUrl(repo, sha)}">${repo.full_name}/$branch/${sha.take(12)}</a>"""
+    }
+
+    def issueStateIcon(iconName: String): String = {
+      s"""<img class="issue-state-icon" src="/static/small/$iconName.png"></img>"""
+    }
+
+    def successIcon(state: String): String = {
+      state match {
+        case "failure" =>
+          issueStateIcon("x")
+        case "success" =>
+          issueStateIcon("check")
+        case _ =>
+          ""
+      }
+    }
+
+    def buildNotificationHeader(n: Notification, prefix: String = ""): String = {
+      //language=HTML
+      s"""
+            <div class="notification header">
+              $prefix<span class="message title">${n.subject.title}</span><br/>
+              ${n.repository.full_name}
+              <span class="message time"><time>${n.updated_at}</time></span>
+              <span class="message reason ${n.reason}">${n.reason}</span>
+             </div>
+             """
+    }
+
+    def buildStatusHeader(n: Notification, title: String, message: String): String = {
+      //language=HTML
+      s"""
+            <div class="notification header">
+              $title<br/>
+              ${n.repository.full_name}
+              <span class="message time"><time>${n.updated_at}</time></span>
+              <span class="message reason ${n.reason}">${n.reason}</span>
+             </div>
+             """ + (if (message.nonEmpty) s"""<div class="notification body">$message</div>""" else "")
+    }
+
+
+
+
     val sttpBackend = new SttpBackendAsyncWrapper(HttpURLConnectionBackend())(executeNow)
     try {
 
@@ -405,17 +469,36 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
       // TODO: with Java 11 we might be able to use real futures?
 
-      if (ifModifiedSince.isEmpty) {
-        // get list of PRs, check which of them require a review
-        api.repos()
-        val issueResponse = if (n.subject.`type` == "PullRequest") Try(gitHubAPI.request[Pull](n.subject.url, userAuth.token).awaitNow).toOption
-
-
-      }
-
       println(s"Request ${userAuth.login}: since $ifModifiedSince")
 
       val api = gitHubAPI.api.authorized("Bearer " + userAuth.token)
+      val prList = if (ifModifiedSince == null) {
+        // full status check - get list of PRs, check which of them require a review
+        val prr = api.search.issues(s"is:pull-request is:open review-requested:${userAuth.login}").at(executeNow).transform {
+          case Success(results) =>
+            val items = if (results.data.items.nonEmpty) {
+
+              """<div class="notification table">""" + results.data.items.map { pr =>
+                //language=HTML
+                s"""
+                <div class='notification item'>
+                <div class="notification header">
+                  ${issueLink(pr)}<span class="message title">${pr.title}</span> <span class="message reason assign">review requested</spam><br/>
+                 </div>
+                  </div>
+                 """
+              }.mkString("<br/") + "</div><hr/>"
+            } else {
+              ""
+            }
+            Success(items)
+          case Failure(_) =>
+            // TODO: process failures
+            Success("")
+        }
+        Await.result(prr, Duration.Inf)
+      } else ""
+
       val r = api.notifications.get(
         ifModifiedSince,
         per_page = 20 // default 50 is too high, often leads to timeouts
@@ -439,72 +522,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           println(s"${userAuth.login}: since $ifModifiedSince / last-mod ${response.headers.lastModified} new: ${newUnread.size}, read: ${read.size}, unread: ${unread.size}")
           // download last comments for the new content
 
-          def issueUrl(n: Notification, issue: IssueOrPull): String = {
-            val selector = if (issue.isInstanceOf[Pull]) "pull" else "issues"
-            s"https://www.github.com/${n.repository.full_name}/$selector/${issue.number}"
-          }
-
-          def issueTitle(issue: IssueOrPull): String = {
-            s"#${issue.number}"
-          }
-
-          def shaUrl(repo: Repository, sha: String) = s"""https://github.com/${repo.full_name}/commit/$sha"""
-
-          def shaLink(repo: Repository, branch: String, sha: String) = {
-            s"""<a href="${shaUrl(repo, sha)}">${repo.full_name}/$branch/${sha.take(12)}</a>"""
-          }
-
-          def issueStateIcon(iconName: String): String = {
-            s"""<img class="issue-state-icon" src="/static/small/$iconName.png"></img>"""
-          }
-
-          def successIcon(state: String): String = {
-            state match {
-              case "failure" =>
-                issueStateIcon("x")
-              case "success" =>
-                issueStateIcon("check")
-              case _ =>
-                ""
-            }
-          }
-
-          def buildNotificationHeader(n: Notification, prefix: String = ""): String = {
-            //language=HTML
-            s"""
-            <div class="notification header">
-              $prefix<span class="message title">${n.subject.title}</span><br/>
-              ${n.repository.full_name}
-              <span class="message time"><time>${n.updated_at}</time></span>
-              <span class="message reason ${n.reason}">${n.reason}</span>
-             </div>
-             """
-          }
-
-          def buildStatusHeader(n: Notification, title: String, message: String): String = {
-            //language=HTML
-            s"""
-            <div class="notification header">
-              $title<br/>
-              ${n.repository.full_name}
-              <span class="message time"><time>${n.updated_at}</time></span>
-              <span class="message reason ${n.reason}">${n.reason}</span>
-             </div>
-             """ + (if (message.nonEmpty) s"""<div class="notification body">$message</div>""" else "")
-          }
-
-          def buildIssueNotificationHeader(n: Notification, i: IssueOrPull): String = {
-
-
-            val icon = i.state match {
-              case "closed" => issueStateIcon("issue-closed")
-              case "open" => issueStateIcon("issue-opened")
-              case _ => ""
-            }
-
-            val issueLink = s"""$icon<a href="${issueUrl(n, i)}">${issueTitle(i)}</a> """
-            buildNotificationHeader(n, issueLink)
-          }
+          def buildIssueNotificationHeader(n: Notification, i: IssueOrPull): String = buildNotificationHeader(n, issueLink(i))
 
           val newComments = newUnread.flatMap {
             case n if n.subject.`type` == "Issue" || n.subject.`type` == "PullRequest" =>
@@ -519,7 +537,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                 println(s"issue ${n.repository.full_name} ${issue.number}")
                 // n.subject.latest_comment_url is sometimes the same as n.subject.url even if some comments exist
                 // this happens e.g. with a state change (issue closed)
-                val prefix = issueUrl(n, issue)
+                val prefix = issue.html_url
 
                 def buildCommentContent(linkUrl: String, linkText: String, by: String, time: ZonedDateTime, body: String) = {
                   val context = n.repository.full_name
@@ -706,6 +724,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               p(
                 a(href := "https://www.github.com/notifications", "GitHub notifications")
               ),
+              raw(prList),
               div(
                 statusMessageText
               ),

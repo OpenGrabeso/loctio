@@ -51,7 +51,8 @@ abstract class DefineRequest(val handleUri: String, val method: Method = Method.
 
     def respondAsHtml(text: String): Unit = {
       val docType = """<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd" >"""
-      val body = docType + text
+      val encoding = """<meta charset="utf-8"/>"""
+      val body = docType + "\n" + encoding + "\n" + text
       resp.`type`("text/html")
       resp.getOutputStream.write(body.getBytes(StandardCharsets.UTF_8))
     }
