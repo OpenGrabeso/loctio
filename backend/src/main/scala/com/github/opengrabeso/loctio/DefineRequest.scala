@@ -48,19 +48,34 @@ abstract class DefineRequest(val handleUri: String, val method: Method = Method.
   def handle(request: Request, resp: Response): Unit = {
 
     val nodes = html(request, resp)
+
+    def respondAsHtml(text: String): Unit = {
+      val docType = """<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd" >"""
+      val body = docType + text
+      resp.`type`("text/html")
+      resp.getOutputStream.write(body.getBytes(StandardCharsets.UTF_8))
+    }
+
+    def respondAsXml(text: String): Unit = {
+      resp.setContentType("text/xml; charset=utf-8")
+      val xmlPrefix = """<?xml version="1.0" encoding="UTF-8"?>""" + "\n"
+      val body = xmlPrefix + text
+      resp.getOutputStream.write(body.getBytes(StandardCharsets.UTF_8))
+      resp.`type`("text/xml")
+    }
+
     if (nodes.nonEmpty) {
       nodes.head match {
+        case xml.Unparsed(body) =>
+          if (body.startsWith("<html>")) {
+            respondAsHtml(body)
+          } else {
+            respondAsXml(body)
+          }
         case <html>{_*}</html> =>
-          val docType = """<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd" >"""
-          val body = docType + nodes.toString
-          resp.`type`("text/html")
-          resp.getOutputStream.write(body.getBytes(StandardCharsets.UTF_8))
+          respondAsHtml(nodes.toString)
         case _ =>
-          resp.setContentType("text/xml; charset=utf-8")
-          val xmlPrefix = """<?xml version="1.0" encoding="UTF-8"?>""" + "\n"
-          val body = xmlPrefix + nodes.toString
-          resp.getOutputStream.write(body.getBytes(StandardCharsets.UTF_8))
-          resp.`type`("text/xml")
+          respondAsXml(nodes.toString)
       }
     }
   }
