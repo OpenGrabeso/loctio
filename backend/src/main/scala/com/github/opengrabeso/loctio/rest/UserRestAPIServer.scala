@@ -535,7 +535,11 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                 Try(gitHubAPI.request[Pull](n.subject.url, userAuth.token).awaitNow).toOption.map { prResponse =>
                   if (
                     !prList.exists(_.html_url == prResponse.html_url)
-                      && (n.reason == "review_requested" || prResponse.requested_reviewers.exists(_.login == userAuth.login))
+                      && prResponse.state == "open"
+                      && (
+                        n.reason == "review_requested" && prResponse.requested_teams.nonEmpty // TODO: check team membership
+                          || prResponse.requested_reviewers.exists(_.login == userAuth.login) // if requested personaly, we do not care what even it was
+                      )
                   ) {
                     prList = prList :+ prResponse
                   }
@@ -601,6 +605,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                     .onlyLastType("mentioned")
                     .onlyLastType("assigned", "unassigned")
                     .onlyLastType("subscribed", "unsubscribed")
+                    .onlyLastType("head_ref_force_pushed", "head_ref_deleted", "head_ref_restored")
                     .map(buildEventData)
                 }
 
