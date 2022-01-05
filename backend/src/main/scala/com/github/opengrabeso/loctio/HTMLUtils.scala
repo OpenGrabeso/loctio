@@ -9,24 +9,26 @@ import org.xhtmlrenderer.resource.XMLResource
 
 object HTMLUtils {
 
-  def rawXHTML(html: String): String = {
+  def rawXHTML(html: String): (String, String) = {
     val document = Jsoup.parse(html)
     document.outputSettings().escapeMode(EscapeMode.xhtml)
     document.outputSettings.syntax(Document.OutputSettings.Syntax.xml)
-    document.html
+    // parse adds html and body elements - we are interested in the body content only
+    (document.body().html, document.html)
   }
 
   def xhtml(html: String): String = {
-    val xml = rawXHTML(html)
-    val r = new StringReader(xml)
+    val (xmlBody, xmlDoc) = rawXHTML(html)
+    // verify we can parse the result
+    val r = new StringReader(xmlDoc)
     //val is = new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))
     try {
       XMLResource.load(r)
-      xml
+      xmlBody
     } catch {
       case ex: Exception =>
         println(s"Not a valid XML, $ex")
-        "<html><body>...</body></html>"
+        "<p>...</p>"
     }
   }
 }
