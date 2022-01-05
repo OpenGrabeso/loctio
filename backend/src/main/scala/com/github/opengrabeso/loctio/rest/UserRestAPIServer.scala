@@ -492,7 +492,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           s"""
                 <div class='notification item'>
                 <div class="notification header">
-                  ${issueLink(pr)}<span class="message title">${pr.title}</span> <span class="message reason assign">review requested</span><br/>
+                  ${issueLink(pr)}<span class="message title">${pr.title}</span> <span class="message reason review_requested">review requested</span><br/>
                  </div>
                   </div>
                  """
@@ -574,12 +574,34 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                       SpecificEventContent(prefix, issueTitle(issue), "requested review at", c.actor.login, c.created_at)
                     case "review_request_removed" =>
                       SpecificEventContent(prefix, issueTitle(issue), "removed review request at", c.actor.login, c.created_at)
+                    case "mentioned" =>
+                      SpecificEventContent(prefix, issueTitle(issue), "was mentioned at", c.actor.login, c.created_at)
                     case e =>
                       EventContent(prefix, issueTitle(issue), e, c.actor.login, c.created_at)
                   }
                 }
+
+                implicit class OnlyLast(es: Seq[Event]) {
+                  def onlyLast(predicate: Event => Boolean): Seq[Event] = {
+                    val last = es.lastIndexWhere(predicate)
+                    if (last <= 0) es
+                    else {
+                      val (to, from) = es.splitAt(last)
+                      to.filterNot(predicate) ++ from
+                    }
+                  }
+                  def onlyLastType(types: String*): Seq[Event] = onlyLast(e => types.contains(e.event))
+                }
+
                 def buildEventDataSeq(es: Seq[Event]) = {
-                  es.map(buildEventData)
+                  // display only the last event in some categories - we are not interested in the complete history
+                  es
+                    .onlyLastType("reopened", "closed")
+                    .onlyLastType("review_requested", "review_request_removed")
+                    .onlyLastType("mentioned")
+                    .onlyLastType("assigned", "unassigned")
+                    .onlyLastType("subscribed", "unsubscribed")
+                    .map(buildEventData)
                 }
 
                 val comments = Try {
