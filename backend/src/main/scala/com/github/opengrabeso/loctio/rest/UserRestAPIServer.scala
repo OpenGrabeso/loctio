@@ -472,7 +472,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
       println(s"Request ${userAuth.login}: since $ifModifiedSince")
 
       val api = gitHubAPI.api.authorized("Bearer " + userAuth.token)
-      val prList = if (ifModifiedSince == null) {
+      var prList = if (ifModifiedSince == null) {
         // full status check - get list of PRs, check which of them require a review
         val prResults = api.search.issues(s"is:pull-request is:open review-requested:${userAuth.login}").at(executeNow).transform {
           case Success(results) =>
@@ -496,7 +496,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                  </div>
                   </div>
                  """
-        }.mkString("<br/") + "</div><hr/>"
+        }.mkString("<br/>") + "</div><hr/>"
       } else {
         ""
       }
@@ -531,9 +531,19 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               import github.rest.EnhancedRestImplicits._
 
               // if there is a comment, the only reason why we need to get the issue is to get its number (we need it for the link)
-              val issueResponse = if (n.subject.`type` == "PullRequest") Try(gitHubAPI.request[Pull](n.subject.url, userAuth.token).awaitNow).toOption
-              else Try(gitHubAPI.request[Issue](n.subject.url, userAuth.token).awaitNow).toOption
+              val issueResponse = if (n.subject.`type` == "PullRequest") {
+                Try(gitHubAPI.request[Pull](n.subject.url, userAuth.token).awaitNow).toOption.map { prResponse =>
+                  if (
+                    !prList.exists(_.html_url == prResponse.html_url)
+                      && (n.reason == "review_requested" || prResponse.requested_reviewers.exists(_.login == userAuth.login))
+                  ) {
+                    prList = prList :+ prResponse
+                  }
+                  prResponse
+                }
+              } else Try(gitHubAPI.request[Issue](n.subject.url, userAuth.token).awaitNow).toOption
               //val since = response.headers.lastModified.map(ZonedDateTime.parse(_, DateTimeFormatter.RFC_1123_DATE_TIME))
+
               for (issue <- issueResponse) yield {
                 println(s"issue ${n.repository.full_name} ${issue.number}")
                 // n.subject.latest_comment_url is sometimes the same as n.subject.url even if some comments exist
