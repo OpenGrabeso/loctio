@@ -91,7 +91,7 @@ object UserRestAPIServer {
     lastComments: Map[String, Seq[NotificationContent]] = Map.empty, // we use URL for identification, as this is sure to be stable for an issue
     info: Map[String, String] = Map.empty, // HTML used to display the info
     mostRecentNotified: Option[ZonedDateTime] = None,
-    reviews: Seq[Pull] = Seq.empty, // list of PRs to be reviewed by the user (or his team)
+    reviews: Seq[IssueOrPull] = Seq.empty, // list of PRs to be reviewed by the user (or his team)
     gitHubStatusReported: String = "none" // most recent github status displayed to the user
   )
 
@@ -474,31 +474,32 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
       val api = gitHubAPI.api.authorized("Bearer " + userAuth.token)
       val prList = if (ifModifiedSince == null) {
         // full status check - get list of PRs, check which of them require a review
-        val prr = api.search.issues(s"is:pull-request is:open review-requested:${userAuth.login}").at(executeNow).transform {
+        val prResults = api.search.issues(s"is:pull-request is:open review-requested:${userAuth.login}").at(executeNow).transform {
           case Success(results) =>
-            val items = if (results.data.items.nonEmpty) {
+            Success(results.data.items)
+          case Failure(_) =>
+            // TODO: process failures
+            Success(Seq.empty)
+        }
+        Await.result(prResults, Duration.Inf)
+      } else {
+        session.map(_.reviews).getOrElse(Seq.empty)
+      }
 
-              """<div class="notification table">""" + results.data.items.map { pr =>
-                //language=HTML
-                s"""
+      val prText = if (prList.nonEmpty) {
+        """<div class="notification table">""" + prList.map { pr =>
+          //language=HTML
+          s"""
                 <div class='notification item'>
                 <div class="notification header">
-                  ${issueLink(pr)}<span class="message title">${pr.title}</span> <span class="message reason assign">review requested</spam><br/>
+                  ${issueLink(pr)}<span class="message title">${pr.title}</span> <span class="message reason assign">review requested</span><br/>
                  </div>
                   </div>
                  """
-              }.mkString("<br/") + "</div><hr/>"
-            } else {
-              ""
-            }
-            Success(items)
-          case Failure(_) =>
-            // TODO: process failures
-            Success("")
-        }
-        Await.result(prr, Duration.Inf)
-      } else ""
-
+        }.mkString("<br/") + "</div><hr/>"
+      } else {
+        ""
+      }
       val r = api.notifications.get(
         ifModifiedSince,
         per_page = 20 // default 50 is too high, often leads to timeouts
@@ -724,7 +725,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
               p(
                 a(href := "https://www.github.com/notifications", "GitHub notifications")
               ),
-              raw(prList),
+              raw(prText),
               div(
                 statusMessageText
               ),
@@ -762,6 +763,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
             comments,
             infos,
             newMostRecentNotified,
+            reviews = prList,
             gitHubStatusReported = statusMessageToReport
           )
           storage.store(sessionFilename, newSession)
