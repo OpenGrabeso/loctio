@@ -46,10 +46,14 @@ assign, author, comment, invitation, manual, mention, review_requested, security
 */
 
 .message.reason.assign {
-    background-color: lightcoral;
+    background-color: coral;
 }
 
 .message.reason.mention {
+    background-color: coral;
+}
+
+.message.reason.review_requested {
     background-color: lightcoral;
 }
 
