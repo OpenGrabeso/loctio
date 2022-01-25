@@ -121,7 +121,6 @@ class ServletRest(handleRequest: RawRest.HandleRequest) extends RestServlet(hand
   def BufferSize = 8192 // private in RestServlet, cannot use it from there
 
   override def service(request: HttpServletRequest, response: HttpServletResponse): Unit = {
-    //val threadFactory = com.google.appengine.api.ThreadManager.currentRequestThreadFactory()
     val r = handleRequest(readRequest(request))
     // async - is it a problem? executed on com.avsystem.commons.concurrent.RunNowEC when the request was using
     RawRest.safeAsync(r) {

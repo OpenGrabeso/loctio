@@ -1,7 +1,5 @@
 package com.github.opengrabeso.loctio
 package requests
-import com.google.appengine.api.taskqueue.{DeferredTask, QueueFactory, TaskOptions}
-import java.time.ZonedDateTime
 
 /**
   * Regular cleanup performed periodically, for all users, not requiring user access information
