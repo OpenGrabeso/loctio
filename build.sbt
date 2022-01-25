@@ -9,8 +9,8 @@ lazy val resolverSettings = Seq(
 
 lazy val commonSettings = Seq(
   organization := "com.github.opengrabeso",
-  version := "0.4.1-beta",
-  scalaVersion := "2.12.10",
+  version := "0.4.2-beta",
+  scalaVersion := "2.12.10", // cannot upgrade until udash is upgraded
   scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature"),
 ) ++ resolverSettings
 
@@ -30,7 +30,7 @@ val udashJQueryVersion = "3.0.1"
 
 // TODO: try to share
 lazy val jvmLibs = Seq(
-  "org.scalatest" %% "scalatest" % "3.1.0" % "test",
+  "org.scalatest" %% "scalatest" % "3.2.9" % "test",
 
   "io.udash" %% "udash-core" % udashVersion,
   "io.udash" %% "udash-rest" % udashVersion,
@@ -39,7 +39,7 @@ lazy val jvmLibs = Seq(
 )
 
 lazy val jsLibs = libraryDependencies ++= Seq(
-  "org.scalatest" %%% "scalatest" % "3.1.0" % "test",
+  "org.scalatest" %%% "scalatest" % "3.2.9" % "test",
   "org.scala-js" %%% "scalajs-dom" % "0.9.7",
   "org.querki" %%% "jquery-facade" % "1.2",
 
