@@ -33,7 +33,7 @@ lazy val jvmLibs = Seq(
   "org.scalatest" %% "scalatest" % "3.2.9" % "test",
 
   "io.udash" %% "udash-core" % udashVersion,
-  "io.udash" %% "udash-rest" % udashVersion,
+  "io.udash" %% "udash-rest" % udashVersion excludeAll(ExclusionRule(organization = "io.netty")),
   "io.udash" %% "udash-rpc" % udashVersion,
   "io.udash" %% "udash-css" % udashVersion,
 )
@@ -164,7 +164,6 @@ lazy val backend = (project in file("backend"))
       "org.eclipse.jetty" % "jetty-server" % "9.4.31.v20200723",
       "org.eclipse.jetty" % "jetty-servlet" % "9.4.31.v20200723",
 
-      "com.google.appengine.tools" % "appengine-gcs-client" % "0.8.1" exclude("javax.servlet", "servlet.api"),
       "com.google.cloud" % "google-cloud-storage" % "1.118.0",
       "com.google.cloud" % "google-cloud-tasks" % "1.33.2",
 

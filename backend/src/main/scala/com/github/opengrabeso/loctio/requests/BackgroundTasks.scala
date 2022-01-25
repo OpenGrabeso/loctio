@@ -6,8 +6,6 @@ import com.avsystem.commons.serialization.GenCodec
 import com.avsystem.commons.serialization.json.JsonStringOutput
 
 import java.util.concurrent.{PriorityBlockingQueue, ThreadFactory}
-import com.google.appengine.api.ThreadManager
-import com.google.appengine.api.utils.SystemProperty
 import com.google.cloud.tasks.v2._
 import com.google.protobuf.{ByteString, Timestamp}
 
@@ -115,7 +113,7 @@ object BackgroundTasks {
   }
 
   // Cloud tasks are suppoted only on the real (production) environment
-  private val appEngine = SystemProperty.environment.value() == SystemProperty.Environment.Value.Production
+  private val appEngine = System.getenv("GAE_ENV") == "standard"
 
   def addTask[T: GenCodec](task: TaskDescription[T], pars: T, eta: Long): Unit = {
     if (appEngine) {
@@ -125,11 +123,4 @@ object BackgroundTasks {
     }
   }
 
-  def currentRequestThreadFactory: ThreadFactory = {
-    if (appEngine) {
-      ThreadManager.currentRequestThreadFactory
-    } else {
-      LocalTaskQueue
-    }
-  }
 }
