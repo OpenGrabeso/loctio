@@ -806,6 +806,9 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           storage.store(sessionFilename, newSession)
 
           val nextAfter = response.headers.xPollInterval.map(_.toInt).getOrElse(60)
+
+          println(s"${userAuth.login}: store lastModified ${newSession.lastModified}")
+
           Success(notificationsTable, notifyUser ++ statusMessageNotification, nextAfter)
         case Failure(github.rest.DataWithHeaders.HttpErrorExceptionWithHeaders(ex, headers)) =>
 
