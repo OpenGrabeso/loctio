@@ -794,7 +794,8 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
           val newSession = TraySession(
             recentSession.map(_.sessionStarted).getOrElse(now),
-            response.headers.lastModified,
+            // if there is no lastModified in the response headers, synthesize a sensible value, as null has a special meaning and causes api.search to be used
+            response.headers.lastModified.orElse(Some(now.minusSeconds(60).toString)),
             now,
             unread,
             comments,
