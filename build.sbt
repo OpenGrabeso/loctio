@@ -33,7 +33,7 @@ lazy val jvmLibs = Seq(
   "org.scalatest" %% "scalatest" % "3.2.9" % "test",
 
   "io.udash" %% "udash-core" % udashVersion,
-  "io.udash" %% "udash-rest" % udashVersion excludeAll(ExclusionRule(organization = "io.netty")),
+  "io.udash" %% "udash-rest" % udashVersion, // excludeAll(ExclusionRule(organization = "io.netty")), // netty needed for the Tray util
   "io.udash" %% "udash-rpc" % udashVersion,
   "io.udash" %% "udash-css" % udashVersion,
 )
