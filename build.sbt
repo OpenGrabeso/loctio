@@ -33,7 +33,7 @@ lazy val jvmLibs = Seq(
   "org.scalatest" %% "scalatest" % "3.2.9" % "test",
 
   "io.udash" %% "udash-core" % udashVersion,
-  "io.udash" %% "udash-rest" % udashVersion, // excludeAll(ExclusionRule(organization = "io.netty")), // netty needed for the Tray util
+  "io.udash" %% "udash-rest" % udashVersion,
   "io.udash" %% "udash-rpc" % udashVersion,
   "io.udash" %% "udash-css" % udashVersion,
 )
@@ -181,6 +181,10 @@ lazy val backend = (project in file("backend"))
       ),
       "org.apache.commons" % "commons-math" % "2.1",
       "commons-io" % "commons-io" % "2.1"
+    ),
+
+    excludeDependencies ++= Seq(
+      ExclusionRule(organization = "io.netty") // netty needed for the Tray util, but not for the backend (using Jetty)
     ),
 
     assembly / assemblyMergeStrategy := {
