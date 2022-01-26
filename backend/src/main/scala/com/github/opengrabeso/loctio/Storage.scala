@@ -82,7 +82,11 @@ object Storage extends common.FileStore {
     val is = input(filename)
     try {
       val ois = new ObjectInputStream(is)
-      readSingleObject[T](ois)
+      try {
+        readSingleObject[T](ois)
+      } finally {
+        ois.close()
+      }
     } catch {
       case ex: IOException =>
         None
