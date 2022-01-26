@@ -1,6 +1,6 @@
 runtime: java11
 instance_class: F1
-entrypoint: java -Xmx52M -XX:MaxMetaspaceSize=56M -jar loctio.jar
+entrypoint: java -Xmx52M -XX:MaxMetaspaceSize=56M -XX:+UseSerialGC -XX:ReservedCodeCacheSize=20M -jar loctio.jar
 automatic_scaling:
   max_instances: 2
   target_cpu_utilization: 0.85
