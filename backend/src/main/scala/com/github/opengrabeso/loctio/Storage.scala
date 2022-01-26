@@ -213,6 +213,7 @@ object Storage extends common.FileStore {
         storage.delete(gcsFilenameOld)
       } finally {
         output.close()
+        in.close()
       }
     }
   }
