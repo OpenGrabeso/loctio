@@ -132,7 +132,7 @@ lazy val frontend = project.settings(
     .dependsOn(sharedJs_JS)
 
 lazy val backend = (project in file("backend"))
-  .enablePlugins(sbtassembly.AssemblyPlugin)
+  .enablePlugins(sbtassembly.AssemblyPlugin, JavaAppPackaging)
   .dependsOn(shared, sharedJs_JVM)
   .settings(
     addJavaScriptToServerResources(),
@@ -203,7 +203,10 @@ lazy val backend = (project in file("backend"))
     },
 
     assembly / assemblyJarName := "loctio.jar",
-    assembly / mainClass := Some("com.github.opengrabeso.loctio.DevServer")
+    assembly / mainClass := Some("com.github.opengrabeso.loctio.DevServer"),
+
+    Docker / packageName := "loctio",
+    Docker / dockerExposedPorts := Seq(8080),
 
   )
 
