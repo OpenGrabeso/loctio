@@ -6,4 +6,4 @@ addSbtPlugin("org.portable-scala" % "sbt-scalajs-crossproject" % "1.0.0")
 
 addSbtPlugin("com.codecommit" % "sbt-github-packages" % "0.5.3")
 
-addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.9.4")
+addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.9.11")
