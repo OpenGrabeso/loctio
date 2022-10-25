@@ -12,24 +12,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           submodules: true
-          token: ${{ secrets.BUILD_TOKEN }}
+          token: ${{ secrets.ORG_TOKEN }}
+
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: 11
+
       - name: Build project # This would actually build your project, using zip for an example artifact
         run: |
-          printf "realm=github\nhost=www.github.com\nuser=${{ secrets.BUILD_USERNAME }}\password=${{ secrets.BUILD_TOKEN }}" > ~/gihub.credentials
-          printf "[github]\n  actor=${{ secrets.GITHUB_ACTOR }}\n  token=${{ secrets.BUILD_TOKEN }}" > ~/.gitconfig
+          printf "realm=github\nhost=www.github.com\nuser=${{ secrets.ORG_USERNAME }}\password=${{ secrets.ORG_TOKEN }}" > ~/gihub.credentials
+          printf "[github]\n  actor=${{ secrets.ORG_USERNAME }}\n  token=${{ secrets.ORG_TOKEN }}" > ~/.gitconfig
           sbt trayUtil/assembly
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BUILD_USERNAME: ${{ secrets.BUILD_USERNAME }}
-          BUILD_TOKEN: ${{ secrets.BUILD_TOKEN }}
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.ORG_TOKEN }}
         with:
           tag_name: ${{ github.ref }}
           release_name: Release ${{ github.ref }}
@@ -39,7 +42,7 @@ jobs:
         id: upload-release-asset
         uses: actions/upload-release-asset@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.ORG_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
           asset_path: ./tray-util/target/scala-2.12/loctio-tray.jar
