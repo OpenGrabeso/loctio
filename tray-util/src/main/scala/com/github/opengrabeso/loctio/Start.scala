@@ -176,6 +176,10 @@ object Start extends SimpleSwingApplication {
         }(global)
 
         requestNotifications(token)
+      }.tap {
+        _.failed.at(global).foreach { ex =>
+          println(s"Login failure $ex")
+        }
       }
     } else {
       Future.successful(())
@@ -235,7 +239,12 @@ object Start extends SimpleSwingApplication {
 
   private def sendShutdown(): Future[Unit] = {
     println("Send shutdown")
-    userApi.at(global).flatMap(_.shutdown(rest.UserRestAPI.RestString("now")))
+    userApi.at(global).flatMap(_.shutdown(rest.UserRestAPI.RestString("now"))).tap {
+      _.failed.at(global).foreach { ex =>
+        println(s"Shutdown: error $ex")
+        ex.printStackTrace()
+      }
+    }
   }
 
   private def appExit() = {
