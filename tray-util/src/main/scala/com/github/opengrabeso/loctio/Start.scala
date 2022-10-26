@@ -63,7 +63,7 @@ object Start extends SimpleSwingApplication {
   }
   // production server
   object ServerProduction extends ServerUsed {
-    def url = "https://loctio.appspot.com"
+    def url = "https://loctio.gamatron.net"
     override def description = ""
   }
 
@@ -217,7 +217,7 @@ object Start extends SimpleSwingApplication {
   }
 
   private def openWeb(): Unit = {
-    Desktop.getDesktop.browse(new URL(s"https://${appName.toLowerCase}.appspot.com").toURI)
+    Desktop.getDesktop.browse(new URL(s"https://${appName.toLowerCase}.gamatron.net").toURI)
   }
 
   private def openWebGitHub(): Unit = {
