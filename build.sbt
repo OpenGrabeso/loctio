@@ -206,7 +206,7 @@ lazy val backend = (project in file("backend"))
     assembly / mainClass := Some("com.github.opengrabeso.loctio.DevServer"),
 
     Docker / packageName := "loctio",
-    Docker / dockerExposedPorts := Seq(8080),
+    dockerExposedPorts := Seq(8080),
 
   )
 
