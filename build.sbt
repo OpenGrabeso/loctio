@@ -12,6 +12,7 @@ lazy val commonSettings = Seq(
   version := "0.4.2-beta",
   scalaVersion := "2.12.10", // cannot upgrade until udash is upgraded
   scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature"),
+  javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
 ) ++ resolverSettings
 
 lazy val jsCommonSettings = Seq(
