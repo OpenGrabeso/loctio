@@ -1,10 +1,10 @@
-name: Deploy App Engine to GCloud
+name: Deploy Docker to GCloud
 
 on:
   push:
     branches:
       - master
-      - java11
+      - docker
 
 jobs:
   deploy:
@@ -30,14 +30,15 @@ jobs:
         run: |
           printf "realm=github\nhost=www.github.com\nuser=${{ secrets.ORG_USERNAME }}\password=${{ secrets.ORG_TOKEN }}" > ~/gihub.credentials
           printf "[github]\n  actor=${{ secrets.ORG_USERNAME }}\n  token=${{ secrets.ORG_TOKEN }}" > ~/.gitconfig
-          sbt backend/assembly
+          sbt backend/Docker/publishLocal
       - name: Setup GCloud
-        uses: google-github-actions/setup-gcloud@v0.2.0
+        uses: google-github-actions/setup-gcloud@v0
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
           service_account_key: ${{ secrets.GCP_SA_KEY }}
           export_default_credentials: true
       - name: Deploy to GCloud
         run: |
-          gcloud app deploy --quiet --project loctio backend/target/scala-2.12/loctio.jar --appyaml=backend/web/WEB-INF/app.yaml
-          gcloud app deploy --quiet --project loctio backend/web/WEB-INF/cron.yaml
+          gcloud auth configure-docker europe-west1-docker.pkg.dev
+          docker tag loctio:0.4.2-beta europe-west1-docker.pkg.dev/loctio/loctio/loctio:v0.4.2-beta
+          docker push europe-west1-docker.pkg.dev/loctio/loctio/loctio:v0.4.2-beta

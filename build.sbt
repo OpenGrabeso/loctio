@@ -12,6 +12,7 @@ lazy val commonSettings = Seq(
   version := "0.4.2-beta",
   scalaVersion := "2.12.10", // cannot upgrade until udash is upgraded
   scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature"),
+  javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
 ) ++ resolverSettings
 
 lazy val jsCommonSettings = Seq(
@@ -132,7 +133,7 @@ lazy val frontend = project.settings(
     .dependsOn(sharedJs_JS)
 
 lazy val backend = (project in file("backend"))
-  .enablePlugins(sbtassembly.AssemblyPlugin)
+  .enablePlugins(sbtassembly.AssemblyPlugin, JavaAppPackaging)
   .dependsOn(shared, sharedJs_JVM)
   .settings(
     addJavaScriptToServerResources(),
@@ -203,7 +204,10 @@ lazy val backend = (project in file("backend"))
     },
 
     assembly / assemblyJarName := "loctio.jar",
-    assembly / mainClass := Some("com.github.opengrabeso.loctio.DevServer")
+    assembly / mainClass := Some("com.github.opengrabeso.loctio.DevServer"),
+
+    Docker / packageName := "loctio",
+    dockerExposedPorts := Seq(8080),
 
   )
 

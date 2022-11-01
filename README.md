@@ -19,6 +19,13 @@ Developer notes
 
 The application project is created in InteliJ IDEA, the project is deployed as Google App Engine.
 
+Developer server
+----------------
+
+To run developer server use entry point DevServer, set environment variable like:
+
+`GOOGLE_APPLICATION_CREDENTIALS=some_path/loctio-xxxx.json`
+
 
 Setup notes
 -----------

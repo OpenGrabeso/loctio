@@ -63,7 +63,7 @@ object Start extends SimpleSwingApplication {
   }
   // production server
   object ServerProduction extends ServerUsed {
-    def url = "https://loctio.appspot.com"
+    def url = "https://loctio.gamatron.net"
     override def description = ""
   }
 
@@ -176,6 +176,10 @@ object Start extends SimpleSwingApplication {
         }(global)
 
         requestNotifications(token)
+      }.tap {
+        _.failed.at(global).foreach { ex =>
+          println(s"Login failure $ex")
+        }
       }
     } else {
       Future.successful(())
@@ -217,7 +221,7 @@ object Start extends SimpleSwingApplication {
   }
 
   private def openWeb(): Unit = {
-    Desktop.getDesktop.browse(new URL(s"https://${appName.toLowerCase}.appspot.com").toURI)
+    Desktop.getDesktop.browse(new URL(s"https://${appName.toLowerCase}.gamatron.net").toURI)
   }
 
   private def openWebGitHub(): Unit = {
@@ -235,7 +239,12 @@ object Start extends SimpleSwingApplication {
 
   private def sendShutdown(): Future[Unit] = {
     println("Send shutdown")
-    userApi.at(global).flatMap(_.shutdown(rest.UserRestAPI.RestString("now")))
+    userApi.at(global).flatMap(_.shutdown(rest.UserRestAPI.RestString("now"))).tap {
+      _.failed.at(global).foreach { ex =>
+        println(s"Shutdown: error $ex")
+        ex.printStackTrace()
+      }
+    }
   }
 
   private def appExit() = {
