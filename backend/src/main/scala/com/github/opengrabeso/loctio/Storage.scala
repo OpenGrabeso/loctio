@@ -15,8 +15,7 @@ import scala.reflect.ClassTag
 import common.FileStore.FullName
 
 object Storage extends common.FileStore {
-  // from https://cloud.google.com/appengine/docs/standard/java/using-cloud-storage
-  final val bucket = "loctio.appspot.com"
+  final val bucket = "loctio.gamatron.net"
 
   type FileItem = Blob
 
