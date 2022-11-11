@@ -46,12 +46,22 @@ object Storage extends common.FileStore {
     Channels.newInputStream(readChannel)
   }
 
-  def store(name: FullName, obj: AnyRef, metadata: (String, String)*) = {
+  def store(name: FullName, obj: AnyRef, metadata: (String, String)*): Unit = {
     //println(s"store '$name'")
     val os = output(name, metadata)
-    val oos = new ObjectOutputStream(os)
-    oos.writeObject(obj)
-    oos.close()
+    val oos = try {
+      new ObjectOutputStream(os)
+    } catch {
+      case ex: Throwable =>
+        // normally oos.close handles this, but in case of new ObjectOutputStream failure we close it here
+        os.close()
+        throw ex
+    }
+    try {
+      oos.writeObject(obj)
+    } finally {
+      oos.close()
+    }
   }
 
   def getFullName(stage: String, filename: String): FullName = {
