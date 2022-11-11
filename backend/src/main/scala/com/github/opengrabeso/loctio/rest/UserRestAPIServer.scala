@@ -296,9 +296,9 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
       def userStateDisplay(state: String) = {
         state match { // from https://www.alt-codes.net/circle-symbols
           case "online" => "⚫"
-          case "offline" => "⦾"
           case "away" => "⦿"
           case "busy" => "⚫"
+          case _ /*"offline"*/ => "⦾"
         }
       }
 
