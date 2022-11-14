@@ -1,7 +1,8 @@
 package com.github.opengrabeso.loctio
 
-import java.util.Properties
+import com.avsystem.commons.serialization.HasGenCodec
 
+import java.util.Properties
 import com.fasterxml.jackson.databind.JsonNode
 import com.google.api.client.http.{GenericUrl, HttpHeaders, HttpResponseException}
 import io.udash.rest.raw.HttpErrorException
@@ -25,6 +26,8 @@ object Main extends common.Formatting {
     lazy val userId: String = login
     def displayName: String = if (fullName.isEmpty) login else fullName
   }
+
+  object GitHubAuthResult extends HasGenCodec[GitHubAuthResult]
 
   private def authRequest(token: String): JsonNode = {
     try {

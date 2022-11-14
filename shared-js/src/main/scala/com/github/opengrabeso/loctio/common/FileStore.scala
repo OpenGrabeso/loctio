@@ -1,9 +1,10 @@
 package com.github.opengrabeso.loctio
 package common
 
+import com.avsystem.commons.serialization.GenCodec
+
 import java.time.temporal.ChronoUnit
 import java.time.{ZoneId, ZonedDateTime}
-
 import scala.reflect.ClassTag
 
 object FileStore {
@@ -39,8 +40,8 @@ trait FileStore {
 
   def deleteItem(item: FileItem): Unit
 
-  def store(name: FullName, obj: AnyRef, metadata: (String, String)*): Unit
-  def load[T: ClassTag](name: FullName): Option[T]
+  def store[T: GenCodec](name: FullName, obj: T, metadata: (String, String)*): Unit
+  def load[T: ClassTag: GenCodec](name: FullName): Option[T]
 
   def itemName(item: FileItem): String
 

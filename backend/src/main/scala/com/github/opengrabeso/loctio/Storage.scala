@@ -50,42 +50,22 @@ object Storage extends common.FileStore {
     Channels.newInputStream(readChannel)
   }
 
-  def store(name: FullName, obj: AnyRef, metadata: (String, String)*): Unit = {
+  def store[T: GenCodec](name: FullName, obj: T, metadata: (String, String)*): Unit = {
     //println(s"store '$name'")
-    // TODO: pass Codec evidence instead
-    getCodec(obj.getClass) match {
-      case Some(codec) =>
-        val os = output(name + ".json", metadata, contentType = "application/json")
-        try {
-          val json = JsonStringOutput.write(obj)(codec.asInstanceOf[GenCodec[AnyRef]])
-          os.write(json.getBytes(StandardCharsets.UTF_8))
-        } finally {
-          os.close()
-        }
-      case None =>
-        // new format not supported for the class yet - use Java serialization
-        val os = output(name, metadata)
-        val oos = try {
-          new ObjectOutputStream(os)
-        } catch {
-          case ex: Throwable =>
-            // normally oos.close handles this, but in case of new ObjectOutputStream failure we close it here
-            os.close()
-            throw ex
-        }
-        try {
-          oos.writeObject(obj)
-        } finally {
-          oos.close()
-        }
+    val codec = implicitly[GenCodec[T]]
+    val os = output(name + ".json", metadata, contentType = "application/json")
+    try {
+      val json = JsonStringOutput.write(obj)(codec)
+      os.write(json.getBytes(StandardCharsets.UTF_8))
+    } catch {
+      case ex: Exception =>
+        println(s"Error in store: ${name.name}: $ex")
+        ex.printStackTrace()
+        throw ex
+    } finally {
+      os.close()
     }
-
   }
-
-  def getFullName(stage: String, filename: String): FullName = {
-    FullName(stage, filename)
-  }
-
 
   private def readSingleObject[T: ClassTag](ois: ObjectInputStream): Option[T] = {
     try {
@@ -134,7 +114,7 @@ object Storage extends common.FileStore {
     }
   }
 
-  def getCodec(c: Class[_]): Option[GenCodec[_]] = {
+  private def getCodec(c: Class[_]): Option[GenCodec[_]] = {
     if (c == classOf[UserList]) {
       Some(implicitly[GenCodec[UserList]])
     } else if (c == classOf[Presence.PresenceInfo]) {
@@ -144,14 +124,8 @@ object Storage extends common.FileStore {
     }
   }
 
-  def load[T : ClassTag](fullName: FullName): Option[T] = {
-    // TODO: pass GenCodec evidence instead
-    val codec = getCodec(classTag[T].runtimeClass)
-
-    codec.flatMap { c =>
-      loadCodec(fullName + ".json")(c).asInstanceOf[Option[T]]
-    }.orElse {
-
+  override def load[T : ClassTag: GenCodec](fullName: FullName): Option[T] = {
+    loadCodec[T](fullName + ".json").orElse {
       object FormatChanged {
         def unapply(arg: Exception): Option[Exception] = arg match {
           case _: java.io.InvalidClassException => Some(arg) // bad serialVersionUID
@@ -162,10 +136,10 @@ object Storage extends common.FileStore {
       }
       try {
         val loaded = loadRawName[T](fullName)
-        if (codec.nonEmpty && loaded.nonEmpty) {
+        if (loaded.nonEmpty) {
           // convert to a new (codec based) representation
           println(s"Convert ${fullName.name} to JSON")
-          store(fullName, loaded.get.asInstanceOf[AnyRef])
+          store(fullName, loaded.get)
         }
         loaded
       } catch {

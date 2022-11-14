@@ -1,9 +1,11 @@
 package com.github.opengrabeso.loctio
 package rest
 
+import com.avsystem.commons.serialization
+import com.avsystem.commons.serialization.{GenCodec, Input}
+
 import java.time.{LocalDateTime, ZoneId, ZonedDateTime}
 import java.time.temporal.ChronoUnit
-
 import com.avsystem.commons.serialization.json.{JsonStringInput, JsonStringOutput}
 import com.softwaremill.sttp.HttpURLConnectionBackend
 import common.FileStore
@@ -11,6 +13,7 @@ import common.model._
 import com.github.opengrabeso.github
 import com.github.opengrabeso.github.{RestAPIClient => GitHubAPIClient}
 import com.github.opengrabeso.github.model._
+import com.github.opengrabeso.github.rest.ZonedDateTimeCodecs
 import io.udash.rest.raw.HttpErrorException
 
 import scala.concurrent.Await
@@ -24,10 +27,15 @@ import scalatags.Text.all._
 
 import scala.collection.JavaConverters._
 
-object UserRestAPIServer {
-  trait NotificationContent {
+object UserRestAPIServer extends ZonedDateTimeCodecs {
+  sealed trait NotificationContent {
     def htmlResult: String
   }
+
+  object NotificationContent {
+    implicit val codec: GenCodec[NotificationContent] = GenCodec.materialize
+  }
+
   case class CommentContent(
     linkUrl: String,
     linkText: String,
@@ -95,6 +103,30 @@ object UserRestAPIServer {
     gitHubStatusReported: String = "none" // most recent github status displayed to the user
   )
 
+  sealed trait IssueOrPullCoded
+  case class IssueCoded(issue: Issue) extends IssueOrPullCoded
+  case class PullCoded(pull: Pull) extends IssueOrPullCoded
+  object IssueOrPullCoded {
+    implicit val codec: GenCodec[IssueOrPullCoded] = GenCodec.materialize
+
+    def encode(src: IssueOrPull): IssueOrPullCoded = src match {
+      case s: Issue => IssueCoded(s)
+      case s: Pull => PullCoded(s)
+    }
+    def decode(src: IssueOrPullCoded): IssueOrPull = src match {
+      case s: IssueCoded => s.issue
+      case s: PullCoded => s.pull
+    }
+  }
+
+  implicit val issueOrPullCodec: GenCodec[IssueOrPull] = GenCodec.transformed[IssueOrPull, IssueOrPullCoded](
+    toRaw = IssueOrPullCoded.encode,
+    fromRaw = IssueOrPullCoded.decode
+  )
+
+  object TraySession {
+    implicit val codec: GenCodec[TraySession] = GenCodec.materialize
+  }
 }
 
 import UserRestAPIServer._
@@ -336,6 +368,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
       // TODO: use some reliable client identification
       // we use shutdown for this, but shutdown may come from web as well
       // we could also apply some heuristics (reset user which was not polling client
+      Storage.delete(sessionFilename + ".json")
       Storage.delete(sessionFilename)
     }
   }
@@ -861,8 +894,15 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           Failure(ex)
       }
       // it would be nice to pass Future directly, but somehow it does not work - probably some Google App Engine limitation
-      Await.result(r, Duration(60, SECONDS))
-
+      val ret = try {
+        Await.result(r, Duration(60, SECONDS))
+      } catch {
+        case ex: Exception =>
+          println("tray notification request failed")
+          ex.printStackTrace()
+          throw ex
+      }
+      ret
       //      trayNotificationsImpl(sttpBackend)
     } finally {
       sttpBackend.close()
