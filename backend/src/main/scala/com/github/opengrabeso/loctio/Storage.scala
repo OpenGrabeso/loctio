@@ -1,8 +1,11 @@
 package com.github.opengrabeso.loctio
 
+import com.avsystem.commons.serialization.GenCodec
+import com.avsystem.commons.serialization.json.{JsonStringInput, JsonStringOutput}
+import com.github.opengrabeso.loctio.Presence.UserList
+
 import java.io._
 import java.nio.channels.Channels
-
 import com.google.auth.oauth2.GoogleCredentials
 
 import collection.JavaConverters._
@@ -10,9 +13,10 @@ import com.google.cloud.storage.{Option => GCSOption, _}
 import com.google.cloud.storage.Storage._
 import org.apache.commons.io.IOUtils
 
-import scala.reflect.ClassTag
-
+import scala.reflect.{ClassTag, classTag}
 import common.FileStore.FullName
+
+import java.nio.charset.StandardCharsets
 
 object Storage extends common.FileStore {
   final val bucket = "loctio.gamatron.net"
@@ -49,19 +53,32 @@ object Storage extends common.FileStore {
   def store(name: FullName, obj: AnyRef, metadata: (String, String)*): Unit = {
     //println(s"store '$name'")
     val os = output(name, metadata)
-    val oos = try {
-      new ObjectOutputStream(os)
-    } catch {
-      case ex: Throwable =>
-        // normally oos.close handles this, but in case of new ObjectOutputStream failure we close it here
-        os.close()
-        throw ex
+    // TODO: pass Codec evidence instead
+    getCodec(obj.getClass) match {
+      case Some(codec) =>
+        try {
+          val json = JsonStringOutput.write(obj)(codec.asInstanceOf[GenCodec[AnyRef]])
+          os.write(json.getBytes(StandardCharsets.UTF_8))
+        } finally {
+          os.close()
+        }
+      case None =>
+        // new format not supported for the class yet -
+        val oos = try {
+          new ObjectOutputStream(os)
+        } catch {
+          case ex: Throwable =>
+            // normally oos.close handles this, but in case of new ObjectOutputStream failure we close it here
+            os.close()
+            throw ex
+        }
+        try {
+          oos.writeObject(obj)
+        } finally {
+          oos.close()
+        }
     }
-    try {
-      oos.writeObject(obj)
-    } finally {
-      oos.close()
-    }
+
   }
 
   def getFullName(stage: String, filename: String): FullName = {
@@ -86,7 +103,19 @@ object Storage extends common.FileStore {
     }
   }
 
-  def loadRawName[T : ClassTag](filename: FullName): Option[T] = {
+  private def loadCodec[T:  GenCodec](filename: FullName): Option[T] = {
+    try {
+      val bytes = storage.readAllBytes(bucket, filename.name)
+      val s = new String(bytes, StandardCharsets.UTF_8)
+      Some(JsonStringInput.read[T](s))
+    } catch {
+      case ex: StorageException if ex.getCode == 404 =>
+        // we expect StorageException - file not found
+        None
+    }
+  }
+
+  private def loadRawName[T : ClassTag](filename: FullName): Option[T] = {
     //println(s"load '$filename' - '$userId'")
     val is = input(filename)
     try {
@@ -104,32 +133,54 @@ object Storage extends common.FileStore {
     }
   }
 
-  def load[T : ClassTag](fullName: FullName): Option[T] = {
-    object FormatChanged {
-      def unapply(arg: Exception): Option[Exception] = arg match {
-        case _: java.io.InvalidClassException => Some(arg) // bad serialVersionUID
-        case _: ClassNotFoundException => Some(arg) // class / package names changed
-        case _: ClassCastException => Some(arg) // class changed (like Joda time -> java.time)
-        case _ => None
-      }
+  def getCodec(c: Class[_]): Option[GenCodec[_]] = {
+    if (c == classOf[UserList]) {
+      Some(implicitly[GenCodec[UserList]])
+    } else {
+      None
     }
-    try {
-      loadRawName(fullName)
-    } catch {
-      case x: StorageException if x.getCode == 404 =>
-        None
-      case FormatChanged(x) =>
-        println(s"load error ${x.getMessage} - $fullName")
-        storage.delete(fileId(fullName.name))
-        None
-      case _: java.io.EOFException =>
-        println(s"Short (most likely empty) file $fullName")
-        None
-      //case ex: java.io.IOException =>
+  }
 
-      case x: Exception =>
-        x.printStackTrace()
-        None
+  def load[T : ClassTag](fullName: FullName): Option[T] = {
+    // TODO: pass GenCodec evidence instead
+    val codec = getCodec(classTag[T].runtimeClass)
+
+    codec.map { c =>
+      loadCodec(fullName)(c).asInstanceOf[Option[T]]
+    }.getOrElse {
+
+      object FormatChanged {
+        def unapply(arg: Exception): Option[Exception] = arg match {
+          case _: java.io.InvalidClassException => Some(arg) // bad serialVersionUID
+          case _: ClassNotFoundException => Some(arg) // class / package names changed
+          case _: ClassCastException => Some(arg) // class changed (like Joda time -> java.time)
+          case _ => None
+        }
+      }
+      try {
+        val loaded = loadRawName(fullName)
+        if (codec.nonEmpty) {
+          // convert to a new (codec based) representation
+          println(s"Convert ${fullName.name} to JSON")
+          store(fullName, loaded)
+        }
+        loaded
+      } catch {
+        case x: StorageException if x.getCode == 404 =>
+          None
+        case FormatChanged(x) =>
+          println(s"load error ${x.getMessage} - $fullName")
+          storage.delete(fileId(fullName.name))
+          None
+        case _: java.io.EOFException =>
+          println(s"Short (most likely empty) file $fullName")
+          None
+        //case ex: java.io.IOException =>
+
+        case x: Exception =>
+          x.printStackTrace()
+          None
+      }
     }
   }
 
@@ -160,77 +211,6 @@ object Storage extends common.FileStore {
       FullName(iName) -> iName.drop(prefix.length)
     }
     actStream.toVector  // toVector to avoid debugging streams, we are always traversing all of them anyway
-  }
-
-  def metadata(name: FullName): Seq[(String, String)] = {
-    val prefix = name
-    val blobs = storage.list(bucket, BlobListOption.prefix(prefix.name))
-    val found = blobs.iterateAll().asScala
-
-    // there should be at most one result
-    found.toSeq.flatMap { i =>
-      assert(i.getName.startsWith(prefix.name))
-      val m = try {
-        val md = storage.get(bucket, i.getName, BlobGetOption.fields(BlobField.METADATA))
-        md.getMetadata.asScala.toSeq
-      } catch {
-        case e: Exception =>
-          e.printStackTrace()
-          Nil
-      }
-      m
-      //println(s"enum '$name' - '$userId': md '$m'")
-    }
-  }
-
-  def metadataValue(item: FullName, name: String): Option[String] = {
-    val md = metadata(item)
-    md.find(_._1 == name).map(_._2)
-  }
-
-  def updateMetadata(item: FullName, metadata: Seq[(String, String)]): Boolean = {
-    val blobId = fileId(item.name)
-    val md = storage.get(blobId, BlobGetOption.fields(BlobField.METADATA))
-    val userData = Option(md.getMetadata).getOrElse(new java.util.HashMap[String, String]).asScala
-    val matching = metadata.forall { case (key, name) =>
-      userData.get(key).contains(name)
-    }
-    if (!matching) {
-      val md = userData ++ metadata
-      val blobInfo = BlobInfo
-        .newBuilder(blobId)
-        .setMetadata(md.asJava)
-        .build()
-      storage.update(blobInfo)
-    }
-    !matching
-  }
-
-  def move(oldName: String, newName: String) : Unit = {
-    if (oldName != newName) {
-      val gcsFilenameOld = fileId(oldName)
-      val gcsFilenameNew = fileId(newName)
-
-      // read metadata
-      val in = input(FullName(oldName))
-
-      val md = storage.get(bucket, oldName, BlobGetOption.fields(BlobField.METADATA))
-      val metadata = md.getMetadata
-
-      val instance = BlobInfo.newBuilder(gcsFilenameNew)
-        .setMetadata(metadata)
-        .setContentType("application/octet-stream").build()
-      val channel = storage.writer(instance)
-
-      val output = Channels.newOutputStream(channel)
-      try {
-        IOUtils.copy(in, output)
-        storage.delete(gcsFilenameOld)
-      } finally {
-        output.close()
-        in.close()
-      }
-    }
   }
 
   def listAllItems(): Iterable[FileItem] = {

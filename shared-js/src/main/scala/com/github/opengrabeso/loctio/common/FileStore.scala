@@ -40,10 +40,6 @@ trait FileStore {
   def store(name: FullName, obj: AnyRef, metadata: (String, String)*): Unit
   def load[T: ClassTag](name: FullName): Option[T]
 
-  def metadata(name: FullName): Seq[(String, String)]
-
-  def updateMetadata(item: FullName, metadata: Seq[(String, String)]): Boolean
-
   def itemName(item: FileItem): String
 
   def cleanup(): Int = {

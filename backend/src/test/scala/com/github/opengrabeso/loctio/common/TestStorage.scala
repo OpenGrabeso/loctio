@@ -26,11 +26,4 @@ class TestStorage extends FileStore {
   }
 
   def itemName(item: FileItem) = item.name
-  def metadata(name: FullName) = files.get(name.name).toSeq.flatMap(_.metadata)
-  def updateMetadata(item: FullName, metadata: Seq[(String, String)]) = {
-    files.get(item.name).exists { f =>
-      files += item.name -> f.copy(metadata = metadata)
-      true
-    }
-  }
 }
