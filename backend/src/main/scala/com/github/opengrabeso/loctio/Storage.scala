@@ -138,7 +138,7 @@ object Storage extends common.FileStore {
   }
 
 
-  def enumerate(prefix: String, filter: Option[String => Boolean] = None): Iterable[(FullName, String)] = {
+  def enumerate(prefix: String): Iterable[(FullName, String)] = {
     val blobs = storage.list(bucket, BlobListOption.prefix(prefix))
     val list = blobs.iterateAll().asScala
     val actStream = for (iCandidate <- list) yield {
@@ -147,17 +147,6 @@ object Storage extends common.FileStore {
       FullName(iName) -> iName.drop(prefix.length)
     }
     actStream.toVector  // toVector to avoid debugging streams, we are always traversing all of them anyway
-  }
-
-  def enumerateAll(): Iterable[String] = {
-    val prefix = ""
-    val blobs = storage.list(bucket, BlobListOption.prefix(prefix))
-    val list = blobs.iterateAll().asScala
-    for (i <- list) yield {
-      assert(i.getName.startsWith(prefix))
-      val name = i.getName.drop(prefix.length)
-      name
-    }
   }
 
   def metadata(name: FullName): Seq[(String, String)] = {
