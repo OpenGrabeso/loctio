@@ -15,7 +15,9 @@ object FileStore {
     }
   }
 
-  case class FullName(name: String)
+  case class FullName(name: String) {
+    def + (s: String): FullName = FullName(name + s)
+  }
 
 }
 

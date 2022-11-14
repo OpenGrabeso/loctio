@@ -30,11 +30,11 @@ object Storage extends common.FileStore {
   val credentials = GoogleCredentials.getApplicationDefault
   val storage = StorageOptions.newBuilder().setCredentials(credentials).build().getService
 
-  def output(filename: FullName, metadata: Seq[(String, String)]): OutputStream = {
+  def output(filename: FullName, metadata: Seq[(String, String)], contentType: String = "application/octet-stream"): OutputStream = {
     val fid = fileId(filename.name)
     val instance = BlobInfo.newBuilder(fid)
       .setMetadata(metadata.toMap.asJava)
-      .setContentType("application/octet-stream").build()
+      .setContentType(contentType).build()
     val channel = storage.writer(instance)
     Channels.newOutputStream(channel)
   }
@@ -52,10 +52,10 @@ object Storage extends common.FileStore {
 
   def store(name: FullName, obj: AnyRef, metadata: (String, String)*): Unit = {
     //println(s"store '$name'")
-    val os = output(name, metadata)
     // TODO: pass Codec evidence instead
     getCodec(obj.getClass) match {
       case Some(codec) =>
+        val os = output(name + ".json", metadata, contentType = "application/json")
         try {
           val json = JsonStringOutput.write(obj)(codec.asInstanceOf[GenCodec[AnyRef]])
           os.write(json.getBytes(StandardCharsets.UTF_8))
@@ -63,7 +63,8 @@ object Storage extends common.FileStore {
           os.close()
         }
       case None =>
-        // new format not supported for the class yet -
+        // new format not supported for the class yet - use Java serialization
+        val os = output(name, metadata)
         val oos = try {
           new ObjectOutputStream(os)
         } catch {
@@ -136,6 +137,8 @@ object Storage extends common.FileStore {
   def getCodec(c: Class[_]): Option[GenCodec[_]] = {
     if (c == classOf[UserList]) {
       Some(implicitly[GenCodec[UserList]])
+    } else if (c == classOf[Presence.PresenceInfo]) {
+      Some(implicitly[GenCodec[Presence.PresenceInfo]])
     } else {
       None
     }
@@ -145,9 +148,9 @@ object Storage extends common.FileStore {
     // TODO: pass GenCodec evidence instead
     val codec = getCodec(classTag[T].runtimeClass)
 
-    codec.map { c =>
-      loadCodec(fullName)(c).asInstanceOf[Option[T]]
-    }.getOrElse {
+    codec.flatMap { c =>
+      loadCodec(fullName + ".json")(c).asInstanceOf[Option[T]]
+    }.orElse {
 
       object FormatChanged {
         def unapply(arg: Exception): Option[Exception] = arg match {
@@ -158,11 +161,11 @@ object Storage extends common.FileStore {
         }
       }
       try {
-        val loaded = loadRawName(fullName)
-        if (codec.nonEmpty) {
+        val loaded = loadRawName[T](fullName)
+        if (codec.nonEmpty && loaded.nonEmpty) {
           // convert to a new (codec based) representation
           println(s"Convert ${fullName.name} to JSON")
-          store(fullName, loaded)
+          store(fullName, loaded.get.asInstanceOf[AnyRef])
         }
         loaded
       } catch {

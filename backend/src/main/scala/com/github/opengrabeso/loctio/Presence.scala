@@ -3,10 +3,11 @@ package com.github.opengrabeso.loctio
 import java.time.{Duration, ZoneOffset, ZonedDateTime}
 import Storage._
 import com.avsystem.commons.serialization.{GenCodec, HasGenCodec}
+import com.github.opengrabeso.github.rest.ZonedDateTimeCodecs
 import common.model._
 import common.FileStore.FullName
 
-object Presence {
+object Presence extends ZonedDateTimeCodecs {
   // contacts/xxx/watching contains list of users we want to watch
   // contacts/xxx/watched-by contains list of users that want to watch us, we allow it by storing true:java.lang.Boolean in the file
 
@@ -65,6 +66,10 @@ object Presence {
     lastSeen: ZonedDateTime,
     state: String
   ) extends Serializable
+
+  object PresenceInfo { // cannot use HasGenCodec, as we need import to ZonedDateTime to be available
+    implicit val codec: GenCodec[PresenceInfo] = GenCodec.materialize
+  }
 
   def reportUser(login: String, ipAddress: String, state: String): Unit = {
     val now = ZonedDateTime.now().withZoneSameInstant(ZoneOffset.UTC)
@@ -128,6 +133,7 @@ object Presence {
     val fullState = (forUser +: watchingAllowed)
       .map(user => user -> load[PresenceInfo](FullName(s"state/$user")))
       .map { case (login, data) =>
+        val watchedBy = relation(watchedByAllowed, watchedByRequested, login)
         data.map { d =>
           // we need to transfer the time as UTC, otherwise the JS client is unable to decode it
           val lastSeen = d.lastSeen.withZoneSameInstant(ZoneOffset.UTC)
@@ -136,9 +142,8 @@ object Presence {
           // when one client has reported going offline, there still may be other clients running
           val state = if (age < 70 && d.state == "offline") "online" else d.state
           //println(s"Report $login as $d")
-          val watchedBy = relation(watchedByAllowed, watchedByRequested, login)
           login -> LocationInfo(Locations.locationFromIpAddress(d.ipAddress), lastSeen, state, Relation.Allowed, watchedBy)
-        }.getOrElse(login -> LocationInfo("", now, "unknown", Relation.No, Relation.No))
+        }.getOrElse(login -> LocationInfo("", now, "unknown", Relation.Allowed, watchedBy))
       }
     if (requests) {
 
