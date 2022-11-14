@@ -137,6 +137,19 @@ object Storage extends common.FileStore {
     storage.delete(fileId(toDelete.name))
   }
 
+  def exists(prefix: String): Boolean = {
+    // storage.list is class A operation, storage.read class B - class A is much more expensive
+    try {
+      // note: storage.reader never fails
+      val bytes = storage.readAllBytes(bucket, prefix)
+      // note: there is currently no content, but the request should fail on non-existent file
+      bytes.asInstanceOf[Unit]
+      true
+    } catch {
+      case ex: StorageException =>
+        false
+    }
+  }
 
   def enumerate(prefix: String): Iterable[(FullName, String)] = {
     val blobs = storage.list(bucket, BlobListOption.prefix(prefix))
