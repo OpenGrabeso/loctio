@@ -137,8 +137,21 @@ object Storage extends common.FileStore {
     storage.delete(fileId(toDelete.name))
   }
 
+  def exists(prefix: String): Boolean = {
+    // storage.list is class A operation, storage.read class B - class A is much more expensive
+    try {
+      // note: storage.reader never fails
+      val bytes = storage.readAllBytes(bucket, prefix)
+      // note: there is currently no content, but the request should fail on non-existent file
+      bytes.asInstanceOf[Unit]
+      true
+    } catch {
+      case ex: StorageException =>
+        false
+    }
+  }
 
-  def enumerate(prefix: String, filter: Option[String => Boolean] = None): Iterable[(FullName, String)] = {
+  def enumerate(prefix: String): Iterable[(FullName, String)] = {
     val blobs = storage.list(bucket, BlobListOption.prefix(prefix))
     val list = blobs.iterateAll().asScala
     val actStream = for (iCandidate <- list) yield {
@@ -147,17 +160,6 @@ object Storage extends common.FileStore {
       FullName(iName) -> iName.drop(prefix.length)
     }
     actStream.toVector  // toVector to avoid debugging streams, we are always traversing all of them anyway
-  }
-
-  def enumerateAll(): Iterable[String] = {
-    val prefix = ""
-    val blobs = storage.list(bucket, BlobListOption.prefix(prefix))
-    val list = blobs.iterateAll().asScala
-    for (i <- list) yield {
-      assert(i.getName.startsWith(prefix))
-      val name = i.getName.drop(prefix.length)
-      name
-    }
   }
 
   def metadata(name: FullName): Seq[(String, String)] = {

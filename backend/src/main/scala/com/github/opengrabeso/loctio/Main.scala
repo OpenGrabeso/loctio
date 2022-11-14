@@ -46,12 +46,12 @@ object Main extends common.Formatting {
   }
 
 
-  def checkUserAuthorized(login: String) = {
-    Storage.enumerate(s"users/$login").nonEmpty
+  def checkUserAuthorized(login: String): Boolean = {
+    Storage.exists(s"users/$login")
   }
 
-  def checkAdminAuthorized(login: String) = {
-    Storage.enumerate(s"admins/$login").nonEmpty
+  def checkAdminAuthorized(login: String): Boolean = {
+    Storage.exists(s"admins/$login")
   }
 
   def authorized(login: String): Unit = {

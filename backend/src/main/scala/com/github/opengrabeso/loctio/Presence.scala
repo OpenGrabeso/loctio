@@ -18,7 +18,7 @@ object Presence {
   def requestWatching(login: String, user: String) = {
     Storage.store(FullName(pathWatching(login, user)), b(false)) // value has no meaning
     // if the request already exists, do not touch it, to prevent overwriting request which was allowed
-    if (Storage.enumerate(pathWatchedBy(user, login)).isEmpty) {
+    if (!Storage.exists(pathWatchedBy(user, login))) {
       Storage.store(FullName(pathWatchedBy(user, login)), b(false))
     }
   }
@@ -60,6 +60,7 @@ object Presence {
     val now = ZonedDateTime.now().withZoneSameInstant(ZoneOffset.UTC)
 
     // filter nonEmpty because folders created from the web console include an item with an empty name
+    // TODO: store in a file and read it (class B op) instead of enumerating (class A op)
     val watching = enumerate(s"contacts/$forUser/watching/").toSeq.map(_._2).filter(_.nonEmpty)
     val watchedBy = enumerate(s"contacts/$forUser/watched-by/").toSeq.map(_._2).filter(_.nonEmpty)
 
