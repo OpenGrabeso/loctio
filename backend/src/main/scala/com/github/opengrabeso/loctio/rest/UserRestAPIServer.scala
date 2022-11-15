@@ -91,6 +91,25 @@ object UserRestAPIServer extends ZonedDateTimeCodecs {
       """
   }
 
+  /** no need to store whole Issue / PR - it could be quite long */
+  case class IssueOrPullRef(
+    state: String,
+    title: String,
+    html_url: String,
+    number: Long
+  )
+
+  object IssueOrPullRef {
+    def from(i: IssueOrPull): IssueOrPullRef = IssueOrPullRef(
+      state = i.state,
+      title = i.title,
+      html_url = i.html_url,
+      number = i.number
+    )
+
+    implicit val codec: GenCodec[IssueOrPullRef] = GenCodec.materialize
+  }
+
   case class TraySession(
     sessionStarted: ZonedDateTime, // used to decide when should be flush (reset) the session to perform a full update
     lastModified: Option[String], // lastModified HTTP headers used for notifications optimization
@@ -99,29 +118,8 @@ object UserRestAPIServer extends ZonedDateTimeCodecs {
     lastComments: Map[String, Seq[NotificationContent]] = Map.empty, // we use URL for identification, as this is sure to be stable for an issue
     info: Map[String, String] = Map.empty, // HTML used to display the info
     mostRecentNotified: Option[ZonedDateTime] = None,
-    reviews: Seq[IssueOrPull] = Seq.empty, // list of PRs to be reviewed by the user (or his team)
+    toReview: Seq[IssueOrPullRef] = Seq.empty, // list of PRs to be reviewed by the user (or his team)
     gitHubStatusReported: String = "none" // most recent github status displayed to the user
-  )
-
-  sealed trait IssueOrPullCoded
-  case class IssueCoded(issue: Issue) extends IssueOrPullCoded
-  case class PullCoded(pull: Pull) extends IssueOrPullCoded
-  object IssueOrPullCoded {
-    implicit val codec: GenCodec[IssueOrPullCoded] = GenCodec.materialize
-
-    def encode(src: IssueOrPull): IssueOrPullCoded = src match {
-      case s: Issue => IssueCoded(s)
-      case s: Pull => PullCoded(s)
-    }
-    def decode(src: IssueOrPullCoded): IssueOrPull = src match {
-      case s: IssueCoded => s.issue
-      case s: PullCoded => s.pull
-    }
-  }
-
-  implicit val issueOrPullCodec: GenCodec[IssueOrPull] = GenCodec.transformed[IssueOrPull, IssueOrPullCoded](
-    toRaw = IssueOrPullCoded.encode,
-    fromRaw = IssueOrPullCoded.decode
   )
 
   object TraySession {
@@ -381,6 +379,16 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
   def trayNotificationsHTMLImpl(storage: common.FileStore): (String, Seq[String], Int) = {
 
 
+    def issueRefLink(issue: IssueOrPullRef): String = {
+      val icon = issue.state match {
+        case "closed" => issueStateIcon("issue-closed")
+        case "open" => issueStateIcon("issue-opened")
+        case _ => ""
+      }
+
+      s"""$icon<a href="${issue.html_url}">${issueRefTitle(issue)}</a> """
+    }
+
     def issueLink(issue: IssueOrPull): String = {
       val icon = issue.state match {
         case "closed" => issueStateIcon("issue-closed")
@@ -389,6 +397,10 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
       }
 
       s"""$icon<a href="${issue.html_url}">${issueTitle(issue)}</a> """
+    }
+
+    def issueRefTitle(issue: IssueOrPullRef): String = {
+      s"#${issue.number}"
     }
 
     def issueTitle(issue: IssueOrPull): String = {
@@ -449,7 +461,14 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
       val gitHubAPI = new GitHubAPIClient[github.rest.RestAPI](sttpBackend, "https://api.github.com")
       val gitHubStatusAPI = new GitHubAPIClient[github.rest.status.GitHubStatusAPI](sttpBackend, "https://www.githubstatus.com/api/v2")
 
-      val session = storage.load[TraySession](sessionFilename)
+      val session = try {
+        storage.load[TraySession](sessionFilename)
+      } catch {
+        case ex: Exception =>
+          println(s"Error loading TraySession: $ex")
+          ex.printStackTrace()
+          None
+      }
       val now = ZonedDateTime.now()
 
       // heuristics to handle missing shutdown
@@ -509,14 +528,14 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
         // full status check - get list of PRs, check which of them require a review
         val prResults = api.search.issues(s"is:pull-request is:open review-requested:${userAuth.login}").at(executeNow).transform {
           case Success(results) =>
-            Success(results.data.items)
+            Success(results.data.items.map(IssueOrPullRef.from))
           case Failure(_) =>
             // TODO: process failures
             Success(Seq.empty)
         }
         Await.result(prResults, Duration.Inf)
       } else {
-        session.map(_.reviews).getOrElse(Seq.empty)
+        session.map(_.toReview).getOrElse(Seq.empty)
       }
 
       val prText = if (prList.nonEmpty) {
@@ -525,7 +544,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           s"""
                 <div class='notification item'>
                 <div class="notification header">
-                  ${issueLink(pr)}<span class="message title">${pr.title}</span> <span class="message reason review_requested">review requested</span><br/>
+                  ${issueRefLink(pr)}<span class="message title">${pr.title}</span> <span class="message reason review_requested">review requested</span><br/>
                  </div>
                   </div>
                  """
@@ -571,10 +590,10 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
                       && prResponse.state == "open"
                       && (
                         n.reason == "review_requested" && prResponse.requested_teams.nonEmpty // TODO: check team membership
-                          || prResponse.requested_reviewers.exists(_.login == userAuth.login) // if requested personaly, we do not care what even it was
+                          || prResponse.requested_reviewers.exists(_.login == userAuth.login) // if requested personally, we do not care what event it was
                       )
                   ) {
-                    prList = prList :+ prResponse
+                    prList = prList :+ IssueOrPullRef.from(prResponse)
                   }
                   prResponse
                 }
@@ -834,7 +853,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
             comments,
             infos,
             newMostRecentNotified,
-            reviews = prList,
+            toReview = prList,
             gitHubStatusReported = statusMessageToReport
           )
           storage.store(sessionFilename, newSession)

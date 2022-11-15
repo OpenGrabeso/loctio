@@ -1,7 +1,7 @@
 package com.github.opengrabeso.loctio
 
 import com.avsystem.commons.serialization.GenCodec
-import com.avsystem.commons.serialization.json.{JsonStringInput, JsonStringOutput}
+import com.avsystem.commons.serialization.json.{JsonOptions, JsonStringInput, JsonStringOutput}
 import com.github.opengrabeso.loctio.Presence.UserList
 
 import java.io._
@@ -55,7 +55,7 @@ object Storage extends common.FileStore {
     val codec = implicitly[GenCodec[T]]
     val os = output(name + ".json", metadata, contentType = "application/json")
     try {
-      val json = JsonStringOutput.write(obj)(codec)
+      val json = JsonStringOutput.write(obj, JsonOptions.Pretty)(codec)
       os.write(json.getBytes(StandardCharsets.UTF_8))
     } catch {
       case ex: Exception =>
