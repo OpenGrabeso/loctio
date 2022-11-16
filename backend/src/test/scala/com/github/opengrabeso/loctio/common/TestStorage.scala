@@ -15,7 +15,9 @@ class TestStorage extends FileStore {
   private val files = mutable.Map.empty[String,FileItem]
 
   def itemModified(fileItem: FileItem) = files.get(fileItem.name).map(_.modified)
-  def listAllItems() = files.values
+  def enumerate(prefix: String): Seq[(FileItem, FileStore.FullName, String)] = files.map { f =>
+    (f._2, FullName(f._1), f._1)
+  }.toSeq
 
   def deleteItem(item: FileItem) = files.remove(item.name)
   def store[T: GenCodec](name: FileStore.FullName, obj: T, metadata: (String, String)*) = {

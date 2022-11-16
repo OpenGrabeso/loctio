@@ -83,13 +83,13 @@ object Storage extends common.FileStore {
     }
   }
 
-  def enumerate(prefix: String): Iterable[(FullName, String)] = {
+  def enumerate(prefix: String): Seq[(FileItem, FullName, String)] = {
     val blobs = storage.list(bucket, BlobListOption.prefix(prefix))
     val list = blobs.iterateAll().asScala
     val actStream = for (iCandidate <- list) yield {
       val iName = iCandidate.getName
       assert(iName.startsWith(prefix))
-      FullName(iName) -> iName.drop(prefix.length)
+      (iCandidate, FullName(iName), iName.drop(prefix.length))
     }
     actStream.toVector  // toVector to avoid debugging streams, we are always traversing all of them anyway
   }

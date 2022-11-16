@@ -13,6 +13,7 @@ object DebugTray extends DefineRequest("/debug-tray") {
       case class FileItem(name: String)
 
       def itemModified(fileItem: dummyStorage.FileItem) = None
+      def enumerate(prefix: String): Seq[(FileItem, FileStore.FullName, String)] = Seq.empty
       def listAllItems() = Seq.empty
       def deleteItem(item: dummyStorage.FileItem) = ()
       def store[T: GenCodec](name: FileStore.FullName, obj: T, metadata: (String, String)*) = ()

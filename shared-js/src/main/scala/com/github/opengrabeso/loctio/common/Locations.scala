@@ -38,7 +38,7 @@ class Locations(storage: FileStore) {
   }
 
   def networksFromLocations(): Unit = {
-    val allLocations = storage.listAllItems().toSeq
+    val allLocations = storage.enumerate("locations/").map(_._1)
 
     // pairs: binary address -> name
     val networkMap = allLocations.flatMap { i =>

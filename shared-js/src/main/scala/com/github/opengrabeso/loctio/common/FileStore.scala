@@ -36,7 +36,7 @@ trait FileStore {
 
   def itemModified(fileItem: FileItem): Option[java.util.Date]
 
-  def listAllItems(): Iterable[FileItem]
+  def enumerate(prefix: String): Seq[(FileItem, FullName, String)]
 
   def deleteItem(item: FileItem): Unit
 
@@ -46,7 +46,7 @@ trait FileStore {
   def itemName(item: FileItem): String
 
   def cleanup(): Int = {
-    val list = listAllItems()
+    val list = enumerate("").map(_._1)
     val now = ZonedDateTime.now()
 
     val ops = for (i <- list) yield {
