@@ -366,7 +366,6 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
       // TODO: use some reliable client identification
       // we use shutdown for this, but shutdown may come from web as well
       // we could also apply some heuristics (reset user which was not polling client
-      Storage.delete(sessionFilename + ".json")
       Storage.delete(sessionFilename)
     }
   }

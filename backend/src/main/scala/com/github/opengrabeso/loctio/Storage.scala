@@ -25,8 +25,6 @@ object Storage extends common.FileStore {
 
   private def fileId(filename: String) = BlobId.of(bucket, filename)
 
-  private def userFilename(namespace: String, filename: String) = FullName(namespace, filename)
-
   val credentials = GoogleCredentials.getApplicationDefault
   val storage = StorageOptions.newBuilder().setCredentials(credentials).build().getService
 
@@ -39,23 +37,11 @@ object Storage extends common.FileStore {
     Channels.newOutputStream(channel)
   }
 
-  def input(filename: FullName): InputStream = {
-    // TODO: check if any prefetch or other large data optimization can be used for GCS
-    // we used openPrefetchingReadChannel with GAE / gcsService
-    //val bufferSize = 1 * 1024 * 1024
-    //val readChannel = gcsService.openPrefetchingReadChannel(fileId(filename.name), 0, bufferSize)
-    val fid = fileId(filename.name)
-    val readChannel = storage.reader(fid)
-
-    Channels.newInputStream(readChannel)
-  }
-
   def store[T: GenCodec](name: FullName, obj: T, metadata: (String, String)*): Unit = {
     //println(s"store '$name'")
-    val codec = implicitly[GenCodec[T]]
     val os = output(name + ".json", metadata, contentType = "application/json")
     try {
-      val json = JsonStringOutput.write(obj, JsonOptions.Pretty)(codec)
+      val json = JsonStringOutput.write(obj, JsonOptions.Pretty)
       os.write(json.getBytes(StandardCharsets.UTF_8))
     } catch {
       case ex: Exception =>
@@ -67,26 +53,9 @@ object Storage extends common.FileStore {
     }
   }
 
-  private def readSingleObject[T: ClassTag](ois: ObjectInputStream): Option[T] = {
+  override def load[T : ClassTag: GenCodec](fullName: FullName): Option[T] = {
     try {
-      val read = ois.readObject()
-      read match {
-        case r: T => Some(r)
-        case null => None
-        case any =>
-          val classTag = implicitly[ClassTag[T]]
-          throw new InvalidClassException(s"Read class ${any.getClass.getName}, expected ${classTag.runtimeClass.getName}")
-      }
-    } catch {
-      case x: StorageException if x.getCode == 404 =>
-        // reading a file which does not exist
-        None
-    }
-  }
-
-  private def loadCodec[T:  GenCodec](filename: FullName): Option[T] = {
-    try {
-      val bytes = storage.readAllBytes(bucket, filename.name)
+      val bytes = storage.readAllBytes(bucket, fullName.name)
       val s = new String(bytes, StandardCharsets.UTF_8)
       Some(JsonStringInput.read[T](s))
     } catch {
@@ -96,73 +65,8 @@ object Storage extends common.FileStore {
     }
   }
 
-  private def loadRawName[T : ClassTag](filename: FullName): Option[T] = {
-    //println(s"load '$filename' - '$userId'")
-    val is = input(filename)
-    try {
-      val ois = new ObjectInputStream(is)
-      try {
-        readSingleObject[T](ois)
-      } finally {
-        ois.close()
-      }
-    } catch {
-      case ex: IOException =>
-        None
-    } finally {
-      is.close()
-    }
-  }
-
-  private def getCodec(c: Class[_]): Option[GenCodec[_]] = {
-    if (c == classOf[UserList]) {
-      Some(implicitly[GenCodec[UserList]])
-    } else if (c == classOf[Presence.PresenceInfo]) {
-      Some(implicitly[GenCodec[Presence.PresenceInfo]])
-    } else {
-      None
-    }
-  }
-
-  override def load[T : ClassTag: GenCodec](fullName: FullName): Option[T] = {
-    loadCodec[T](fullName + ".json").orElse {
-      object FormatChanged {
-        def unapply(arg: Exception): Option[Exception] = arg match {
-          case _: java.io.InvalidClassException => Some(arg) // bad serialVersionUID
-          case _: ClassNotFoundException => Some(arg) // class / package names changed
-          case _: ClassCastException => Some(arg) // class changed (like Joda time -> java.time)
-          case _ => None
-        }
-      }
-      try {
-        val loaded = loadRawName[T](fullName)
-        if (loaded.nonEmpty) {
-          // convert to a new (codec based) representation
-          println(s"Convert ${fullName.name} to JSON")
-          store(fullName, loaded.get)
-        }
-        loaded
-      } catch {
-        case x: StorageException if x.getCode == 404 =>
-          None
-        case FormatChanged(x) =>
-          println(s"load error ${x.getMessage} - $fullName")
-          storage.delete(fileId(fullName.name))
-          None
-        case _: java.io.EOFException =>
-          println(s"Short (most likely empty) file $fullName")
-          None
-        //case ex: java.io.IOException =>
-
-        case x: Exception =>
-          x.printStackTrace()
-          None
-      }
-    }
-  }
-
   def delete(toDelete: FullName): Boolean = {
-    storage.delete(fileId(toDelete.name))
+    storage.delete(fileId(toDelete.name + ".json"))
   }
 
   def exists(prefix: String): Boolean = {
