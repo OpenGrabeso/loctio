@@ -105,6 +105,11 @@ object Storage extends common.FileStore {
 
   def deleteItem(item: FileItem) = storage.delete(item.getName)
 
-  def itemName(item: FileItem): String = item.getName
+  def itemName(item: FileItem): String = {
+    // .json extension is added transparent to users
+    val json = ".json"
+    val s = item.getName
+    if (s.endsWith(json)) s.dropRight(json.length) else s
+  }
 
 }
