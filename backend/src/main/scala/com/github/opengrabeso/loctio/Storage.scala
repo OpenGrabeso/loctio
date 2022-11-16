@@ -55,7 +55,7 @@ object Storage extends common.FileStore {
 
   override def load[T : ClassTag: GenCodec](fullName: FullName): Option[T] = {
     try {
-      val bytes = storage.readAllBytes(bucket, fullName.name)
+      val bytes = storage.readAllBytes(bucket, fullName.name + ".json")
       val s = new String(bytes, StandardCharsets.UTF_8)
       Some(JsonStringInput.read[T](s))
     } catch {

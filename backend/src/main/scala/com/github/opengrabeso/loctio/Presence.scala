@@ -94,16 +94,7 @@ object Presence extends ZonedDateTimeCodecs {
   object UserList extends HasGenCodec[UserList]
 
   private def loadUserList(prefix: String) = {
-    load[UserList](FullName(prefix + "-users")).getOrElse {
-      // filter nonEmpty because folders created from the web console include an item with an empty name
-      val files = enumerate(prefix + "/").toSeq.filter(_._2.nonEmpty)
-      val content = files.map { f =>
-        f._2 -> load[java.lang.Boolean](f._1).contains(true)
-      }
-      val converted = UserList(content.toMap)
-      store(FullName(prefix + "-users"), converted)
-      converted
-    }
+    load[UserList](FullName(prefix + "-users")).getOrElse(UserList(Map.empty))
   }
 
   private def storeUserList(prefix: String, list: UserList): Unit = {
