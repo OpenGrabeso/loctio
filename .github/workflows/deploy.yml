@@ -50,6 +50,8 @@ jobs:
           docker tag ${SERVICE}:0.4.2-beta ${IMAGE}:${BRANCH_NAME}
           docker push ${IMAGE}:${BRANCH_NAME}
           gcloud run deploy ${SERVICE} --image ${IMAGE}:${BRANCH_NAME}
+          gcloud run services update-traffic ${SERVICE} --to-latest
+          
           # List images with no tags
           gcloud container images list-tags ${IMAGE} --filter='-tags:*' --format="get(digest)" --limit=10 > tags
           # Delete the images
