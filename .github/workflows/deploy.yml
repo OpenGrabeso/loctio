@@ -44,20 +44,23 @@ jobs:
           SERVICE: loctio
         run: |
           gcloud auth configure-docker europe-west1-docker.pkg.dev
+          gcloud config set core/project loctio
+          gcloud config set run/region europe-west1
+          
           docker tag ${SERVICE}:0.4.2-beta ${IMAGE}:${BRANCH_NAME}
           docker push ${IMAGE}:${BRANCH_NAME}
-          gcloud run deploy ${SERVICE} --region europe-west1 --image ${IMAGE}:${BRANCH_NAME}
+          gcloud run deploy ${SERVICE} --image ${IMAGE}:${BRANCH_NAME}
           # List images with no tags
           gcloud container images list-tags ${IMAGE} --filter='-tags:*' --format="get(digest)" --limit=10 > tags
           # Delete the images
           while read p; do gcloud container images delete "${IMAGE}@$p" --quiet; done < tags
 
           # List all revisions
-          gcloud run revisions list --region europe-west1 --service ${SERVICE}
+          gcloud run revisions list --service ${SERVICE}
           # List last created revision (it should be the active one)
           ACTIVE=$(gcloud run services describe ${SERVICE} --format="value(status.latestCreatedRevisionName)" --region=europe-west1)
           if [ "$ACTIVE" != "" ]; then
-            gcloud run revisions list --region europe-west1 --service ${SERVICE} --filter="metadata.name!=$ACTIVE" --format="get(metadata.name)" >nonactive
+            gcloud run revisions list --service ${SERVICE} --filter="metadata.name!=$ACTIVE" --format="get(metadata.name)" >nonactive
             echo "Delete all but $ACTIVE"
-            while read p; do gcloud run revisions delete --region europe-west1 $p --quiet; done < nonactive
+            while read p; do gcloud run revisions delete $p --quiet; done < nonactive
           fi
