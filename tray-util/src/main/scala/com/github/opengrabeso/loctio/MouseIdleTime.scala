@@ -30,7 +30,7 @@ object MouseIdleTime {
 
   private var lastState: WatchedState = currentState()
 
-  Start.system.scheduler.schedule(Duration(5, duration.SECONDS), Duration(5, duration.SECONDS)) {
+  Start.system.scheduler.scheduleAtFixedRate(Duration(5, duration.SECONDS), Duration(5, duration.SECONDS)) { () =>
     val s = currentState()
     synchronized {
       if (s != lastState) {

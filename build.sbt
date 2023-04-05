@@ -99,6 +99,8 @@ lazy val trayUtil = (project in file("tray-util"))
     commonSettings,
     flyingSaucersSettings,
     libraryDependencies += "com.typesafe.akka" %% "akka-http" % "10.5.0",
+    libraryDependencies += "com.typesafe.akka" %% "akka-actor-typed" % "2.7.0",
+    libraryDependencies += "com.typesafe.akka" %% "akka-stream" % "2.7.0",
     libraryDependencies += "com.twelvemonkeys.imageio" % "imageio-bmp" % "3.5",
     libraryDependencies += "org.scala-lang.modules" %% "scala-swing" % "2.1.1",
     libraryDependencies += "net.java.dev.jna" % "jna" % "5.5.0",

@@ -166,7 +166,7 @@ object Start extends SimpleSwingApplication {
         loginName = s
         println(s"Login as $role done $s for")
         // request users regularly
-        updateSchedule = system.scheduler.schedule(Duration(0, duration.MINUTES), Duration(1, duration.MINUTES)) {
+        updateSchedule = system.scheduler.scheduleAtFixedRate(Duration(0, duration.MINUTES), Duration(1, duration.MINUTES)) {() =>
           requestUsers.at(OnSwing).foreach { case (users, tooltip) =>
             if (token == cfg.token) { // ignore any pending futures with a different token
               usersReady = true
@@ -269,7 +269,7 @@ object Start extends SimpleSwingApplication {
 
   def iconImages(iconName: String) = {
     val images = loadScaledImages(iconName, Seq(16, 24, 32, 48, 64).map(s => new Dimension(s, s)))
-    import collection.JavaConverters._
+    import scala.jdk.CollectionConverters._
     images.asJava
 
   }
@@ -408,7 +408,7 @@ object Start extends SimpleSwingApplication {
       if (SwingUtilities.isEventDispatchThread) {
         callback
       } else {
-        val p = Promise[T]
+        val p = Promise[T]()
         OnSwing.future(p.success(callback))
         Await.result(p.future, Duration.Inf)
       }
