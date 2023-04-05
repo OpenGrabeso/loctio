@@ -16,6 +16,9 @@ lazy val commonSettings = Seq(
 ) ++ resolverSettings
 
 lazy val jsCommonSettings = Seq(
+  libraryDependencies += "com.zoepepper" %%% "scalajs-jsjoda" % "1.2.0",
+  libraryDependencies += "com.zoepepper" %%% "scalajs-jsjoda-as-java-time" % "1.2.0",
+  excludeDependencies += ExclusionRule(organization = "io.github.cquiroz") // workaround for https://github.com/cquiroz/scala-java-time/issues/257
 )
 
 lazy val flyingSaucersSettings = Seq(
@@ -43,8 +46,6 @@ lazy val jsLibs = libraryDependencies ++= Seq(
   "org.scala-js" %%% "scalajs-dom" % "2.4.0",
   "org.querki" %%% "jquery-facade" % "2.1",
 
-  "io.github.cquiroz" %%% "scala-java-time" % "2.5.0",
-
   "io.udash" %%% "udash-core" % udashVersion,
   "io.udash" %%% "udash-rest" % udashVersion,
   "io.udash" %%% "udash-rpc" % udashVersion,
@@ -52,6 +53,7 @@ lazy val jsLibs = libraryDependencies ++= Seq(
 
   "io.udash" %%% "udash-bootstrap4" % udashVersion,
   "io.udash" %%% "udash-jquery" % udashJQueryVersion,
+
 
 )
 
@@ -71,12 +73,14 @@ lazy val sharedJs = crossProject(JSPlatform, JVMPlatform)
   .crossType(CrossType.Pure).in(file("shared-js"))
   .disablePlugins(sbtassembly.AssemblyPlugin)
   .enablePlugins(JSDependenciesPlugin)
-  .settings(commonSettings)
+  .settings(
+    commonSettings,
+  )
   .jvmSettings(libraryDependencies ++= jvmLibs)
   .jsSettings(
     jsCommonSettings,
     jsLibs,
-    jsDeps
+    jsDeps,
   )
 
 lazy val sharedJs_JVM = sharedJs.jvm
@@ -186,7 +190,8 @@ lazy val backend = (project in file("backend"))
     ),
 
     excludeDependencies ++= Seq(
-      ExclusionRule(organization = "io.netty") // netty needed for the Tray util, but not for the backend (using Jetty)
+      ExclusionRule(organization = "io.netty"), // netty needed for the Tray util, but not for the backend (using Jetty)
+      ExclusionRule(organization = "io.github.cquiroz") // we do not need this on JVM - workaround for https://github.com/cquiroz/scala-java-time/issues/257
     ),
 
     assembly / assemblyMergeStrategy := {

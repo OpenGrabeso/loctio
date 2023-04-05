@@ -6,14 +6,22 @@ import java.time.{Duration, ZoneId, ZonedDateTime}
 import model._
 
 object UserState {
-  def getEffectiveUserStatus(state: String, time: ZonedDateTime) = {
-    val now = try {
+  def zonedDateTimeNow() = {
+    // workaround for https://github.com/cquiroz/scala-java-time/issues/257
+    try {
       ZonedDateTime.now()
     } catch {
       case ex: Exception =>
+
+        //println(s"Fallback: now failed with $ex")
         // sometimes fails with e.g. java.time.zone.ZoneRulesException: Unknown time-zone ID: Europe/Prague
         ZonedDateTime.now(ZoneId.of("Z"))
     }
+
+  }
+
+  def getEffectiveUserStatus(state: String, time: ZonedDateTime) = {
+    val now = zonedDateTimeNow()
     val age = Duration.between(time, now).toMinutes
     val displayState = state match {
       case  "online" | "busy" =>
@@ -45,12 +53,7 @@ object UserState {
       val roundOffset = (t.getMinute + 7)  / 15 * 15 - t.getMinute
       t.plusMinutes(roundOffset)
     }
-    val now = try {
-      ZonedDateTime.now()
-    } catch {
-      case ex: Exception =>
-        ZonedDateTime.now(ZoneId.of("Z"))
-    }
+    val now = zonedDateTimeNow()
     val since = t.until(now, ChronoUnit.MINUTES)
     val daysSince = ChronoUnit.DAYS.between(t.toLocalDate, now.toLocalDate)
     if (since < 10) "5 min ago"
