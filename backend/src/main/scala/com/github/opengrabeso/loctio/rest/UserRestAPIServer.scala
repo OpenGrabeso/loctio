@@ -7,7 +7,7 @@ import com.avsystem.commons.serialization.{GenCodec, Input}
 import java.time.{LocalDateTime, ZoneId, ZonedDateTime}
 import java.time.temporal.ChronoUnit
 import com.avsystem.commons.serialization.json.{JsonStringInput, JsonStringOutput}
-import sttp.client3.{HttpClientFutureBackend, HttpURLConnectionBackend}
+import sttp.client3.okhttp.OkHttpFutureBackend
 import common.FileStore
 import common.model._
 import com.github.opengrabeso.github
@@ -454,7 +454,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
 
 
-    val sttpBackend = HttpClientFutureBackend()
+    val sttpBackend = OkHttpFutureBackend() // HttpClientFutureBackend returned GO AWAY received
     try {
 
       val gitHubAPI = new GitHubAPIClient[github.rest.RestAPI](sttpBackend, "https://api.github.com")

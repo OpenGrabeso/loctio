@@ -45,7 +45,12 @@ object UserState {
       val roundOffset = (t.getMinute + 7)  / 15 * 15 - t.getMinute
       t.plusMinutes(roundOffset)
     }
-    val now = ZonedDateTime.now()
+    val now = try {
+      ZonedDateTime.now()
+    } catch {
+      case ex: Exception =>
+        ZonedDateTime.now(ZoneId.of("Z"))
+    }
     val since = t.until(now, ChronoUnit.MINUTES)
     val daysSince = ChronoUnit.DAYS.between(t.toLocalDate, now.toLocalDate)
     if (since < 10) "5 min ago"

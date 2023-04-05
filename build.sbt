@@ -101,6 +101,7 @@ lazy val trayUtil = (project in file("tray-util"))
     libraryDependencies += "com.typesafe.akka" %% "akka-http" % "10.5.0",
     libraryDependencies += "com.typesafe.akka" %% "akka-actor-typed" % "2.7.0",
     libraryDependencies += "com.typesafe.akka" %% "akka-stream" % "2.7.0",
+    libraryDependencies += "com.softwaremill.sttp.client3" %% "okhttp-backend" % "3.8.14",
     libraryDependencies += "com.twelvemonkeys.imageio" % "imageio-bmp" % "3.5",
     libraryDependencies += "org.scala-lang.modules" %% "scala-swing" % "2.1.1",
     libraryDependencies += "net.java.dev.jna" % "jna" % "5.5.0",
@@ -162,6 +163,8 @@ lazy val backend = (project in file("backend"))
       "com.google.http-client" % "google-http-client-appengine" % "1.39.0",
       "com.google.http-client" % "google-http-client-jackson2" % "1.39.0",
       "com.google.apis" % "google-api-services-storage" % "v1-rev171-1.25.0",
+
+      "com.softwaremill.sttp.client3" %% "okhttp-backend" % "3.8.14",
 
       "org.eclipse.jetty" % "jetty-server" % "9.4.31.v20200723",
       "org.eclipse.jetty" % "jetty-servlet" % "9.4.31.v20200723",
