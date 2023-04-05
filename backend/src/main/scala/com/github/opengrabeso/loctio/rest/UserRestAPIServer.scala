@@ -177,7 +177,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
     object ZoneComparator extends Ordering[ZoneId] {
       override def compare(zoneId1: ZoneId, zoneId2: ZoneId) = {
-        val now = LocalDateTime.now
+        val now = LocalDateTime.now(ZoneId.of("Z")) // zone does not matter, we are interested about differences
         val offset1 = now.atZone(zoneId1).getOffset
         val offset2 = now.atZone(zoneId2).getOffset
         val r = offset1.compareTo(offset2)

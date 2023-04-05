@@ -43,6 +43,8 @@ lazy val jsLibs = libraryDependencies ++= Seq(
   "org.scala-js" %%% "scalajs-dom" % "2.4.0",
   "org.querki" %%% "jquery-facade" % "2.1",
 
+  "io.github.cquiroz" %%% "scala-java-time" % "2.5.0",
+
   "io.udash" %%% "udash-core" % udashVersion,
   "io.udash" %%% "udash-rest" % udashVersion,
   "io.udash" %%% "udash-rpc" % udashVersion,

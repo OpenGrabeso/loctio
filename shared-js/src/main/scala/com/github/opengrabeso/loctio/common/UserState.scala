@@ -2,13 +2,18 @@ package com.github.opengrabeso.loctio
 package common
 
 import java.time.temporal.ChronoUnit
-import java.time.{Duration, ZonedDateTime}
-
+import java.time.{Duration, ZoneId, ZonedDateTime}
 import model._
 
 object UserState {
   def getEffectiveUserStatus(state: String, time: ZonedDateTime) = {
-    val now = ZonedDateTime.now()
+    val now = try {
+      ZonedDateTime.now()
+    } catch {
+      case ex: Exception =>
+        // sometimes fails with e.g. java.time.zone.ZoneRulesException: Unknown time-zone ID: Europe/Prague
+        ZonedDateTime.now(ZoneId.of("Z"))
+    }
     val age = Duration.between(time, now).toMinutes
     val displayState = state match {
       case  "online" | "busy" =>

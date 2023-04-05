@@ -491,7 +491,12 @@ object Start extends SimpleSwingApplication {
     private val fmtTime = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(loc)
     private val fmtDate = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(loc)
     private val fmtDayOfWeek = DateTimeFormatter.ofPattern("eeee", loc) // Exactly 4 pattern letters will use the full form
-    private val zone = ZoneId.systemDefault()
+    private val zone = try {
+      ZoneId.systemDefault()
+    } catch {
+      case ex: Exception =>
+        ZoneId.of("Z") // fallback - see https://github.com/cquiroz/scala-java-time/issues/257
+    }
 
     private def displayTime(t: ZonedDateTime) = {
       common.UserState.smartTime(t.withZoneSameInstant(zone), fmtTime.format, fmtDate.format, fmtDayOfWeek.format)
