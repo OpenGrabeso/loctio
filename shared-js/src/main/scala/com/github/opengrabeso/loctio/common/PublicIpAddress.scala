@@ -13,8 +13,8 @@ object PublicIpAddress {
 
     val promise = Promise[String]()
 
-    implicit val sttpBackend = io.udash.rest.DefaultSttpBackend()
-    val response = request.send()
+    val sttpBackend = io.udash.rest.DefaultSttpBackend()
+    val response = request.send(sttpBackend)
     response.onComplete {
       case Success(r) =>
         r.body match {

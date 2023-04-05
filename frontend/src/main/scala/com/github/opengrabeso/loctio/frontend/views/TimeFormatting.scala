@@ -34,42 +34,42 @@ trait TimeFormatting {
   }
 
   def formatDateTime(t: js.Date): String = {
-    formatWithOptions(t, intl.DateTimeFormatOptions(
-      year = "numeric",
-      month = "numeric",
-      day = "numeric",
-      hour = "numeric",
+    formatWithOptions(t, new intl.DateTimeFormatOptions {
+      year = "numeric"
+      month = "numeric"
+      day = "numeric"
+      hour = "numeric"
       minute = "numeric"
-    ))
+    })
   }
 
   def formatDate(t: js.Date): String = {
-    formatWithOptions(t, intl.DateTimeFormatOptions(
-      year = "numeric",
-      month = "numeric",
+    formatWithOptions(t, new intl.DateTimeFormatOptions {
+      year = "numeric"
+      month = "numeric"
       day = "numeric"
-    ))
+    })
   }
 
   def formatDayOfWeek(t: js.Date): String = {
-    formatWithOptions(t, intl.DateTimeFormatOptions(
+    formatWithOptions(t, new intl.DateTimeFormatOptions {
       weekday = "long"
-    ))
+    })
   }
 
   def formatTime(t: js.Date): String = {
-    formatWithOptions(t, intl.DateTimeFormatOptions(
-      hour = "numeric",
-      minute = "numeric",
-    ))
+    formatWithOptions(t, new intl.DateTimeFormatOptions {
+      hour = "numeric"
+      minute = "numeric"
+    })
   }
 
   def formatTimeHMS(t: js.Date): String = {
-    formatWithOptions(t, intl.DateTimeFormatOptions(
-      hour = "numeric",
-      minute = "numeric",
-      second = "numeric",
-    ))
+    formatWithOptions(t, new intl.DateTimeFormatOptions {
+      hour = "numeric"
+      minute = "numeric"
+      second = "numeric"
+    })
   }
 
   implicit class ZonedDateTimeOps(t: ZonedDateTime) {
