@@ -16,7 +16,6 @@ lazy val commonSettings = Seq(
 ) ++ resolverSettings
 
 lazy val jsCommonSettings = Seq(
-  scalacOptions ++= Seq("-P:scalajs:sjsDefinedByDefault")
 )
 
 lazy val flyingSaucersSettings = Seq(

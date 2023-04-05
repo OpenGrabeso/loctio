@@ -3,8 +3,8 @@ package com.github.opengrabeso.loctio.frontend.views
 import java.time.{ZoneOffset, ZonedDateTime}
 
 import scala.scalajs.js
-import org.scalajs.dom.experimental.intl
-import org.scalajs.dom.experimental.intl.DateTimeFormatOptions
+import org.scalajs.dom.intl
+import org.scalajs.dom.intl.DateTimeFormatOptions
 
 import scala.scalajs.js.annotation.JSGlobal
 import scala.scalajs.js.{Date, |}

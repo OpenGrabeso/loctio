@@ -1,7 +1,7 @@
 package com.github.opengrabeso.loctio.shared
 
 trait Timing {
-  def logTime(msg: =>String)
+  def logTime(msg: =>String): Unit
 }
 
 object Timing {

@@ -11,6 +11,7 @@ import javax.servlet.http.{HttpServletRequest, HttpServletResponse, HttpSession}
 
 import scala.annotation.tailrec
 import scala.util.{Failure, Success}
+import monix.execution.Scheduler.Implicits.global
 
 trait ReadRequest {
   def maxPayloadSize: Long
@@ -39,7 +40,7 @@ trait ReadRequest {
   def readBody(request: HttpServletRequest): HttpBody = {
     val contentLength = request.getContentLength.opt.filter(_ != -1)
     contentLength.filter(_ > maxPayloadSize).foreach { length =>
-      throw HttpErrorException(413, s"Payload is larger than maximum $maxPayloadSize bytes ($length)")
+      throw HttpErrorException.plain(413, s"Payload is larger than maximum $maxPayloadSize bytes ($length)")
     }
 
     request.getContentType.opt.fold(HttpBody.empty) { contentType =>
@@ -68,7 +69,7 @@ trait ReadRequest {
             case len =>
               bodyOs.write(bbuf, 0, len)
               if (bodyOs.size > maxPayloadSize) {
-                throw HttpErrorException(413, s"Payload is larger than maximum $maxPayloadSize bytes")
+                throw HttpErrorException.plain(413, s"Payload is larger than maximum $maxPayloadSize bytes")
               }
               readLoop()
           }
@@ -115,22 +116,22 @@ trait WriteResponse {
 /**
   * Class based on io.udash.rest.RestServlet
   * GAE currently does not support async requests, therefore rewrite of that class was required.
+  *
+  * TODO: GAE should support async now. This should no longer be needed
   * */
 class ServletRest(handleRequest: RawRest.HandleRequest) extends RestServlet(handleRequest) with ReadRequest with WriteResponse {
   def maxPayloadSize = RestServlet.DefaultMaxPayloadSize
   def BufferSize = 8192 // private in RestServlet, cannot use it from there
 
   override def service(request: HttpServletRequest, response: HttpServletResponse): Unit = {
-    val r = handleRequest(readRequest(request))
-    // async - is it a problem? executed on com.avsystem.commons.concurrent.RunNowEC when the request was using
-    RawRest.safeAsync(r) {
-      case Success(restResponse) =>
+    val r = handleRequest(readRequest(request)).runAsync {
+      case Right(restResponse) =>
         writeResponse(response, restResponse)
-      case Failure(e: HttpErrorException) =>
+      case Left(e: HttpErrorException) =>
         writeResponse(response, e.toResponse)
-      case Failure(e) =>
-        writeFailure(response, e.getMessage.opt)
+      case Left(e) =>
         logger.error("Failed to handle REST request", e)
+        writeFailure(response, e.getMessage.opt)
     }
   }
 }
