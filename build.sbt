@@ -215,8 +215,9 @@ lazy val backend = (project in file("backend"))
     Docker / packageName := "loctio",
     dockerExposedPorts := Seq(8080),
     dockerBaseImage := "openjdk:11-jre-slim",
-    javaOptions ++= Seq(
-      "-Xmx128M"
+
+    Universal / javaOptions ++= Seq(
+      "-Xmx256M"
       // note: app.yaml is no longer used, we need to specify options here
       // -XX:MaxMetaspaceSize=56M -XX:+UseSerialGC -XX:ReservedCodeCacheSize=20M -jar loctio.jar
     )
