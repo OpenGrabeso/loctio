@@ -3,7 +3,7 @@
   <dontWrapJar>true</dontWrapJar>
   <headerType>gui</headerType>
   <jar>Loctio-tray.jar</jar>
-  <outfile>W:\OpenSource\loctio\tray-util\target\scala-2.12\Loctio.exe</outfile>
+  <outfile>W:\OpenSource\loctio\tray-util\target\scala-2.13\Loctio.exe</outfile>
   <errTitle></errTitle>
   <cmdLine></cmdLine>
   <chdir>.</chdir>
