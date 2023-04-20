@@ -47,7 +47,7 @@ jobs:
           gcloud config set core/project loctio
           gcloud config set run/region europe-west1
           
-          docker tag ${SERVICE}:0.4.2-beta ${IMAGE}:${BRANCH_NAME}
+          docker tag ${SERVICE}:0.5.0 ${IMAGE}:${BRANCH_NAME}
           docker push ${IMAGE}:${BRANCH_NAME}
           gcloud run deploy ${SERVICE} --image ${IMAGE}:${BRANCH_NAME}
           gcloud run services update-traffic ${SERVICE} --to-latest
