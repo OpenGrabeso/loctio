@@ -127,7 +127,7 @@ object Headers {
       ),
       p(
         GlobalStyles.footerText,
-        " © 2020 ",
+        " © 2020 - 2023",
         a(
           href := s"https://github.com/gamatron/$gitHubName",
           GlobalStyles.footerLink,
