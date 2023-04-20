@@ -11,6 +11,8 @@ import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.servlet.{ServletContextHandler, ServletHolder}
 import monix.execution.Scheduler.Implicits.global
 
+import java.lang.management.ManagementFactory
+
 object DevServer {
   val portNumber = System.getenv.getOrDefault("PORT", "8080").toInt
   val GAE_APPLICATION = System.getenv.get("GAE_APPLICATION")
@@ -28,6 +30,9 @@ object DevServer {
   )
 
   def main(args: Array[String]): Unit = {
+    val runtimeMxBean = ManagementFactory.getRuntimeMXBean
+    import scala.jdk.CollectionConverters._
+    println(s"Java version ${System.getProperty("java.version")}, JVM arguments: ${runtimeMxBean.getInputArguments.asScala.mkString(" ")}")
     println(s"Starting Jetty at port $portNumber, environment $GAE_ENV")
     val server = new Server(portNumber)
     val handler = new ServletContextHandler
