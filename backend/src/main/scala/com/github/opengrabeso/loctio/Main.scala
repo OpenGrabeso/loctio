@@ -5,7 +5,7 @@ import com.avsystem.commons.serialization.HasGenCodec
 import java.util.Properties
 import com.fasterxml.jackson.databind.JsonNode
 import com.google.api.client.http.{GenericUrl, HttpHeaders, HttpResponseException}
-import io.udash.rest.raw.HttpErrorException
+import io.udash.rest.raw.{HttpBody, HttpErrorException}
 import common.ChainingSyntax._
 
 object Main extends common.Formatting {
@@ -39,12 +39,12 @@ object Main extends common.Formatting {
       jsonMapper.readTree(response.getContent)
     } catch {
       case e: HttpResponseException if e.getStatusCode == 401 || e.getStatusCode == 403 =>
-        throw HttpErrorException(e.getStatusCode, e.getStatusMessage)
+        throw HttpErrorException.plain(e.getStatusCode, e.getStatusMessage)
       case e: HttpResponseException =>
         println(s"Unexpected auth error $e")
-        throw HttpErrorException(e.getStatusCode, e.getStatusMessage)
+        throw HttpErrorException.plain(e.getStatusCode, e.getStatusMessage)
       case ex: Exception =>
-        throw HttpErrorException(500, "Unexpected error when authenticating with GitHub")
+        throw HttpErrorException.plain(500, "Unexpected error when authenticating with GitHub")
     }
   }
 
@@ -62,7 +62,7 @@ object Main extends common.Formatting {
     // check normal user list
     if (!checkUserAuthorized(login)) {
       if (!checkAdminAuthorized(login)) {
-        throw HttpErrorException(403, s"User $login not authorized. Contact server administrator to get the access")
+        throw HttpErrorException.plain(403, s"User $login not authorized. Contact server administrator to get the access")
       }
     }
   }
@@ -70,7 +70,7 @@ object Main extends common.Formatting {
   def authorizedAdmin(login: String): Unit = {
     // admins are always authorized, no need to list them
     if (!checkAdminAuthorized(login)) {
-      throw HttpErrorException(403, s"Admin $login not authorized. Contact server administrator to get the access")
+      throw HttpErrorException.plain(403, s"Admin $login not authorized. Contact server administrator to get the access")
     }
   }
 

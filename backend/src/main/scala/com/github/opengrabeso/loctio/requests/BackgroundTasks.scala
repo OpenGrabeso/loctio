@@ -9,7 +9,7 @@ import java.util.concurrent.{PriorityBlockingQueue, ThreadFactory}
 import com.google.cloud.tasks.v2._
 import com.google.protobuf.{ByteString, Timestamp}
 
-import collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import java.nio.charset.StandardCharsets
 
 object BackgroundTasks {

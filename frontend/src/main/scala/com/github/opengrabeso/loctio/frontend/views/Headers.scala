@@ -12,7 +12,7 @@ import io.udash.bootstrap.utils.BootstrapStyles._
 import io.udash.css._
 import org.scalajs.dom
 import org.scalajs.dom.Node
-import org.scalajs.dom.raw.HTMLElement
+import org.scalajs.dom.HTMLElement
 
 object Headers {
   abstract class PagePresenter[T<: State](application: Application[RoutingState]) extends Presenter[T] {
@@ -28,7 +28,7 @@ object Headers {
 
     private val settingsToken = Property[String]("")
     private val settingsOkButton = UdashButton(
-      Color.Success.toProperty, disabled = settingsToken.transform(_.isEmpty)
+      options = Color.Success.option, disabled = settingsToken.transform(_.isEmpty)
     )(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "OK"))
     buttonOnClick(settingsOkButton) {
       globals.subProp(_.token).set(settingsToken.get)
@@ -48,7 +48,7 @@ object Headers {
       footerFactory = Some { _ =>
         div(
           settingsOkButton.render,
-          UdashButton(Color.Danger.toProperty)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "Cancel")).render
+          UdashButton(options = Color.Danger.option)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "Cancel")).render
         ).render
       }
     )

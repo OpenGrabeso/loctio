@@ -12,13 +12,13 @@ import scalatags.JsDom.all._
 
 import scala.util.Try
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.scalajs.concurrent.JSExecutionContext.Implicits.queue
 
 // TODO: edit PageModel instead of the global data
 class PageView(
   model: ModelProperty[PageModel],
   presenter: PagePresenter
-) extends Headers.PageView(presenter) with FinalView with CssView with PageUtils with TimeFormatting {
+) extends Headers.PageView(presenter) with View with CssView with PageUtils with TimeFormatting {
   val s = SelectPageStyles
 
 
@@ -27,7 +27,7 @@ class PageView(
     val userSettings = ApplicationContext.serverSettings
 
     implicit class AsString(intProp: Property[Int]) {
-      def asString: Property[String] = intProp.transform(_.toString, s => Try(s.toInt).getOrElse(0))
+      def asString: Property[String] = intProp.bitransform(_.toString)(s => Try(s.toInt).getOrElse(0))
     }
 
     val hourModifiers = Seq[Modifier](Flex.grow0(), attr("min") := "0", attr("max") := "24")

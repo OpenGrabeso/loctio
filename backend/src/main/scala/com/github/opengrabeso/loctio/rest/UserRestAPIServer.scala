@@ -7,7 +7,7 @@ import com.avsystem.commons.serialization.{GenCodec, Input}
 import java.time.{LocalDateTime, ZoneId, ZonedDateTime}
 import java.time.temporal.ChronoUnit
 import com.avsystem.commons.serialization.json.{JsonStringInput, JsonStringOutput}
-import com.softwaremill.sttp.HttpURLConnectionBackend
+import sttp.client3.okhttp.OkHttpFutureBackend
 import common.FileStore
 import common.model._
 import com.github.opengrabeso.github
@@ -25,7 +25,7 @@ import common.ChainingSyntax._
 import common.Util._
 import scalatags.Text.all._
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 object UserRestAPIServer extends ZonedDateTimeCodecs {
   sealed trait NotificationContent {
@@ -136,7 +136,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
     state match {
       case "online" | "offline" | "busy" | "away" | "invisible" =>
       case _ =>
-        throw HttpErrorException(400, s"Unknown state $state")
+        throw HttpErrorException.plain(400, s"Unknown state $state")
     }
   }
 
@@ -145,7 +145,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
     addr match {
       case Valid() =>
       case _ =>
-        throw HttpErrorException(400, s"Invalid IP address $addr")
+        throw HttpErrorException.plain(400, s"Invalid IP address $addr")
     }
   }
 
@@ -165,7 +165,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
   def settings = syncResponse {
     currentUserSettings.getOrElse {
-      throw HttpErrorException(404, "No settings for the user yet")
+      throw HttpErrorException.plain(404, "No settings for the user yet")
     }
   }
 
@@ -177,7 +177,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
     object ZoneComparator extends Ordering[ZoneId] {
       override def compare(zoneId1: ZoneId, zoneId2: ZoneId) = {
-        val now = LocalDateTime.now
+        val now = LocalDateTime.now(ZoneId.of("Z")) // zone does not matter, we are interested about differences
         val offset1 = now.atZone(zoneId1).getOffset
         val offset2 = now.atZone(zoneId2).getOffset
         val r = offset1.compareTo(offset2)
@@ -195,10 +195,10 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
   def addUser(userName: String) = syncResponse {
     Main.authorizedAdmin(userAuth.login)
     if (Main.checkAdminAuthorized(userName)) {
-      throw HttpErrorException(400, "Cannot add admin as an ordinary user")
+      throw HttpErrorException.plain(400, "Cannot add admin as an ordinary user")
     }
     if (Main.checkUserAuthorized(userName)) {
-      throw HttpErrorException(400, "User already exists")
+      throw HttpErrorException.plain(400, "User already exists")
     }
     Storage.store(FileStore.FullName("users", userName), "user")
     Presence.listUsers(userAuth.login, true)
@@ -253,7 +253,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
   }
 
   private def differentUserRequired(user: String): Unit = {
-    if (userAuth.login == user) throw HttpErrorException(400, "Only different users can be watched")
+    if (userAuth.login == user) throw HttpErrorException.plain(400, "Only different users can be watched")
   }
 
   def requestWatching(user: String) = syncResponse {
@@ -351,7 +351,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
     Presence.getUser(login).map { presence =>
       Locations.nameLocation(presence.ipAddress, name)
       Presence.listUsers(userAuth.login, true)
-    }.getOrElse(throw HttpErrorException(500, "User presence not found"))
+    }.getOrElse(throw HttpErrorException.plain(500, "User presence not found"))
   }
 
   private val sessionFilename = FileStore.FullName("tray", userAuth.login)
@@ -454,7 +454,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
 
 
 
-    val sttpBackend = new SttpBackendAsyncWrapper(HttpURLConnectionBackend())(executeNow)
+    val sttpBackend = OkHttpFutureBackend() // HttpClientFutureBackend returned GO AWAY received
     try {
 
       val gitHubAPI = new GitHubAPIClient[github.rest.RestAPI](sttpBackend, "https://api.github.com")
@@ -792,9 +792,8 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           }
 
           // remove comments for the messages we no longer display
-          // map(identity) is a workaround for https://github.com/scala/bug/issues/6654
-          val comments = recentSession.map(_.lastComments.filterKeys(unreadIds.contains).map(identity)).getOrElse(Map.empty) ++ newComments.map(c => c._1 -> c._2)
-          val infos = recentSession.map(_.info.filterKeys(unreadIds.contains).map(identity)).getOrElse(Map.empty) ++ newComments.flatMap(c => c._3.map(c3 => c._1 -> c3))
+          val comments = recentSession.map(_.lastComments.view.filterKeys(unreadIds.contains).toMap).getOrElse(Map.empty) ++ newComments.map(c => c._1 -> c._2)
+          val infos = recentSession.map(_.info.view.filterKeys(unreadIds.contains).toMap).getOrElse(Map.empty) ++ newComments.flatMap(c => c._3.map(c3 => c._1 -> c3)).toMap
 
           def notificationHTML(n: Notification, comments: Map[String, Seq[NotificationContent]], infos: Map[String, String]) = {
             val header = infos.getOrElse(n.id, buildNotificationHeader(n))
@@ -865,7 +864,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
         case Failure(github.rest.DataWithHeaders.HttpErrorExceptionWithHeaders(ex, headers)) =>
 
           if (ex.code != 304 ) {
-            println(s"HTTP error code ${ex.code} cause ${ex.payload.getOrElse("")}")
+            println(s"HTTP error code ${ex.code} cause ${ex.payload.textualContentOpt.getOrElse("")}")
           }
           val nextAfter = headers.xPollInterval.map(_.toInt).getOrElse(60)
 
@@ -887,7 +886,7 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
           // update the session info to keep alive (prevent resetting)
           storage.store(sessionFilename, newSession)
 
-          val errorMessage = ex.payload.toOption.filter(_.nonEmpty).map(payload => s": $payload").getOrElse("")
+          val errorMessage = ex.payload.textualContentOpt.filter(_.nonEmpty).map(payload => s": $payload").getOrElse("")
 
           val errorReport = if (ex.code != 304) {
             // TODO: display notification (on first error only)

@@ -13,7 +13,7 @@ import scala.util.{Failure, Success}
 object ApplicationContext {
   case class UserContextData(userId: String, token: String)
 
-  implicit val ec = ExecutionContext.global
+  implicit val ec: ExecutionContext = scala.scalajs.concurrent.JSExecutionContext.queue
 
   private val routingRegistry = new RoutingRegistryDef
   private val viewFactoryRegistry = new StatesToViewFactoryDef

@@ -45,6 +45,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.ORG_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-          asset_path: ./tray-util/target/scala-2.12/loctio-tray.jar
+          asset_path: ./tray-util/target/scala-2.13/loctio-tray.jar
           asset_name: loctio-tray.jar
           asset_content_type: application/java-archive

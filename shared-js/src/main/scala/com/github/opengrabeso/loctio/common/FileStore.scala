@@ -47,7 +47,7 @@ trait FileStore {
 
   def cleanup(): Int = {
     val list = enumerate("").map(_._1)
-    val now = ZonedDateTime.now()
+    val now = ZonedDateTime.now(ZoneId.of("Z"))
 
     val ops = for (i <- list) yield {
       val name = itemName(i)
@@ -58,7 +58,7 @@ trait FileStore {
         maxDays <- maxAgeInDays
         modTime <- itemModified(i)
       } yield {
-        val fileTime = ZonedDateTime.ofInstant(modTime.toInstant, ZoneId.systemDefault)
+        val fileTime = ZonedDateTime.ofInstant(modTime.toInstant, ZoneId.of("Z"))
         val age = ChronoUnit.DAYS.between(fileTime, now)
         if (age >= maxDays) {
           deleteItem(i)

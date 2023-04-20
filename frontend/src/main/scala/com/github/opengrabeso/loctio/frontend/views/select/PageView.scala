@@ -18,7 +18,7 @@ import scalatags.JsDom.all._
 class PageView(
   model: ModelProperty[PageModel],
   presenter: PagePresenter
-) extends Headers.PageView(presenter) with FinalView with CssView with PageUtils with TimeFormatting {
+) extends Headers.PageView(presenter) with View with CssView with PageUtils with TimeFormatting {
   val s = SelectPageStyles
 
   val settings = ApplicationContext.settings
@@ -33,11 +33,11 @@ class PageView(
   val setLocationUser = Property[String]("")
   val setLocationAddr = Property[String]("")
   val setLocationLocation = Property[String]("")
-  val locationOkButton = UdashButton(Color.Success.toProperty)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "OK"))
+  val locationOkButton = UdashButton(options = Color.Success.option)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "OK"))
 
-  val watchUserButton = UdashButton(Color.Secondary.toProperty)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "Watch user..."))
+  val watchUserButton = UdashButton(options = Color.Secondary.option)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "Watch user..."))
 
-  val addUserButton = UdashButton(Color.Secondary.toProperty)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "Add user..."))
+  val addUserButton = UdashButton(options = Color.Secondary.option)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "Add user..."))
 
   buttonOnClick(locationOkButton) {
     presenter.setLocationName(setLocationUser.get, setLocationLocation.get)
@@ -57,7 +57,7 @@ class PageView(
     footerFactory = Some { _ =>
       div(
         locationOkButton.render,
-        UdashButton(Color.Danger.toProperty)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "Cancel")).render
+        UdashButton(options = Color.Danger.option)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "Cancel")).render
       ).render
     }
   )
@@ -65,7 +65,7 @@ class PageView(
   class EnterUser(title: String) {
 
     val userName = Property[String]("")
-    val okButton = UdashButton(Color.Success.toProperty)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "OK"))
+    val okButton = UdashButton(options = Color.Success.option)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "OK"))
 
     val modal = UdashModal(Some(Size.Small).toProperty)(
       headerFactory = Some(_ => div(h2(title)).render),
@@ -81,7 +81,7 @@ class PageView(
       footerFactory = Some { _ =>
         div(
           okButton.render,
-          UdashButton(Color.Danger.toProperty)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "Cancel")).render
+          UdashButton(options = Color.Danger.option)(_ => Seq[Modifier](UdashModal.CloseButtonAttr, "Cancel")).render
         ).render
       }
     )
@@ -193,7 +193,7 @@ class PageView(
 
     def getErrorText(ex: Throwable) = ex match {
       case he: HttpErrorException =>
-        s"HTTP Error ${he.code} ${he.payload.getOrElse("")}"
+        s"HTTP Error ${he.code} ${he.payload.textualContentOpt.getOrElse("")}"
       case _ =>
         ex.toString
     }

@@ -10,7 +10,7 @@ case class HtmlData(data: String)
 
 object HtmlData extends rest.EnhancedRestDataCompanion[HtmlData] {
   implicit val rawReal: AsRawReal[RestResponse, HtmlData] = AsRawReal.create(
-    real => RestResponse(200, IMapping[PlainValue](), HttpBody.textual(real.data, mediaType = "text/html")),
+    real => RestResponse(200, IMapping.create[PlainValue](), HttpBody.textual(real.data, mediaType = "text/html")),
     raw => HtmlData(raw.body.readText())
   )
 
@@ -20,7 +20,7 @@ case class CssData(data: String)
 
 object CssData extends rest.EnhancedRestDataCompanion[CssData] {
   implicit val rawReal: AsRawReal[RestResponse, CssData] = AsRawReal.create(
-    real => RestResponse(200, IMapping[PlainValue](), HttpBody.textual(real.data, mediaType = "text/css")),
+    real => RestResponse(200, IMapping.create[PlainValue](), HttpBody.textual(real.data, mediaType = "text/css")),
     raw => CssData(raw.body.readText())
   )
 

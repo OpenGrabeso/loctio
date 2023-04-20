@@ -73,7 +73,7 @@ object IssueStyles extends CssBase  {
         lineHeight(20 px)
       ),
       unsafeChild(".blob-num:before") (
-        content := "attr(data-line-number)"
+        content :=! "attr(data-line-number)"
       ),
 
       unsafeChild(".blob-code-inner") (
