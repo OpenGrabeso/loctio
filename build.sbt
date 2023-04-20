@@ -72,7 +72,7 @@ val jacksonVersion = "2.14.2"
 lazy val sharedJs = crossProject(JSPlatform, JVMPlatform)
   .crossType(CrossType.Pure).in(file("shared-js"))
   .disablePlugins(sbtassembly.AssemblyPlugin)
-  .enablePlugins(JSDependenciesPlugin)
+  .jsConfigure(_.enablePlugins(JSDependenciesPlugin))
   .settings(
     commonSettings,
   )
