@@ -212,15 +212,18 @@ lazy val backend = (project in file("backend"))
     assembly / assemblyJarName := "loctio.jar",
     assembly / mainClass := Some("com.github.opengrabeso.loctio.DevServer"),
 
-    Docker / packageName := "loctio",
-    dockerExposedPorts := Seq(8080),
-    dockerBaseImage := "openjdk:11-jre-slim",
-
     Universal / javaOptions ++= Seq(
       "-Xmx256M"
       // note: app.yaml is no longer used, we need to specify options here
       // -XX:MaxMetaspaceSize=56M -XX:+UseSerialGC -XX:ReservedCodeCacheSize=20M -jar loctio.jar
-    )
+    ),
+
+    Docker / packageName := "loctio",
+    dockerExposedPorts := Seq(8080),
+    dockerBaseImage := "openjdk:11-jre-slim",
+
+    dockerEntrypoint ++= (Universal / javaOptions).value
+
 
   )
 
