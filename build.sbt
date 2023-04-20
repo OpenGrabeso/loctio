@@ -213,7 +213,8 @@ lazy val backend = (project in file("backend"))
     assembly / mainClass := Some("com.github.opengrabeso.loctio.DevServer"),
 
     Universal / javaOptions ++= Seq(
-      "-Xmx256M"
+      // -J params will be added as jvm parameters
+      "-J-Xmx256M" // see https://www.scala-sbt.org/sbt-native-packager/archetypes/java_app/customize.html
       // note: app.yaml is no longer used, we need to specify options here
       // -XX:MaxMetaspaceSize=56M -XX:+UseSerialGC -XX:ReservedCodeCacheSize=20M -jar loctio.jar
     ),
@@ -221,10 +222,6 @@ lazy val backend = (project in file("backend"))
     Docker / packageName := "loctio",
     dockerExposedPorts := Seq(8080),
     dockerBaseImage := "openjdk:11-jre-slim",
-
-    dockerEntrypoint ++= (Universal / javaOptions).value
-
-
   )
 
 lazy val root = (project in file(".")).aggregate(backend).settings(
