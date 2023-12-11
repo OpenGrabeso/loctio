@@ -112,6 +112,8 @@ lazy val trayUtil = (project in file("tray-util"))
     libraryDependencies ++= commonLibs ++ jvmLibs,
     assembly / assemblyJarName := "loctio-tray.jar",
     assembly / assemblyMergeStrategy := {
+      case PathList("module-info.class") => MergeStrategy.discard // not creating library, discard should be OK
+      case path if path.endsWith("/module-info.class") => MergeStrategy.discard
       case x if x.contains("io.netty.versions.properties") => MergeStrategy.discard
       case x =>
         val oldStrategy = (assembly / assemblyMergeStrategy).value
@@ -203,6 +205,8 @@ lazy val backend = (project in file("backend"))
         MergeStrategy.first
       case PathList("META-INF", ps @ _*) if ps.nonEmpty && Seq("native-image.properties", "reflection-config.json").contains(ps.last) =>
         MergeStrategy.first
+      case PathList("module-info.class") => MergeStrategy.discard // not creating library, discard should be OK
+      case path if path.endsWith("/module-info.class") => MergeStrategy.discard
       case x =>
         // default handling for things like INDEX.LIST (see https://stackoverflow.com/a/46287790/16673)
         val oldStrategy = (assembly / assemblyMergeStrategy).value
