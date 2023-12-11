@@ -18,6 +18,6 @@ jobs:
           java-version: 11
       - name: Run tests
         run: |
-          printf "realm=github\nhost=www.github.com\nuser=${{ secrets.ORG_USERNAME }}\password=${{ secrets.ORG_TOKEN }}" > ~/gihub.credentials
-          printf "[github]\n  actor=${{ secrets.ORG_USERNAME }}\n  token=${{ secrets.ORG_TOKEN }}" > ~/.gitconfig
+          printf "realm=github\nhost=www.github.com\nuser=${{ vars.ORG_USERNAME }}\password=${{ secrets.ORG_TOKEN }}" > ~/gihub.credentials
+          printf "[github]\n  actor=${{ vars.ORG_USERNAME }}\n  token=${{ secrets.ORG_TOKEN }}" > ~/.gitconfig
           sbt backend/test trayUtil/test backend/products
