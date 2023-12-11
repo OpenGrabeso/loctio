@@ -31,7 +31,7 @@ import scala.swing.event.MouseClicked
 
 object Start extends SimpleSwingApplication {
 
-  implicit val system = ActorSystem()
+  implicit val system: ActorSystem = ActorSystem()
 
   val exitEvent = Promise[Boolean]()
 

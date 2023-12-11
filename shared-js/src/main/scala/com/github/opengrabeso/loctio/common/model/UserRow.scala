@@ -13,5 +13,5 @@ case class UserRow(
 )
 
 object UserRow extends EnhancedRestDataCompanion[UserRow] {
-  implicit val modelPropertyCreator = ModelPropertyCreator.materialize[UserRow]
+  implicit val modelPropertyCreator: ModelPropertyCreator[UserRow] = ModelPropertyCreator.materialize[UserRow]
 }

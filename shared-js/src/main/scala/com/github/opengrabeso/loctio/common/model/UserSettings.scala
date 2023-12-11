@@ -15,5 +15,5 @@ case class UserSettings(
 )
 
 object UserSettings extends EnhancedRestDataCompanion[UserSettings] {
-  implicit val modelPropertyCreator = ModelPropertyCreator.materialize[UserSettings]
+  implicit val modelPropertyCreator: ModelPropertyCreator[UserSettings] = ModelPropertyCreator.materialize[UserSettings]
 }
