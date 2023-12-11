@@ -45,7 +45,6 @@ class PagePresenter(
   def startListening(ipAddress: String): Unit = {
     val token = ApplicationContext.currentToken
     assert(token.nonEmpty)
-    assert(ipAddress.nonEmpty)
 
     lastActive = System.currentTimeMillis()
 

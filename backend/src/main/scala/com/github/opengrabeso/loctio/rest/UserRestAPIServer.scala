@@ -231,7 +231,12 @@ class UserRestAPIServer(val userAuth: Main.GitHubAuthResult) extends UserRestAPI
     }
 
     checkState(state)
-    checkIpAddress(ipAddress)
+    // if user did not provide its IP address, check how we see it from out side
+    val publicIPAddress = if (ipAddress.nonEmpty) {
+      checkIpAddress(ipAddress)
+    } else {
+
+    }
     // when the user is away or invisible, do not update his presence
     if (state != "away" && state != "invisible") {
       //println(s"Presence.reportUser ${userAuth.login} $state")

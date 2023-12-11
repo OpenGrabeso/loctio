@@ -22,10 +22,13 @@ object PublicIpAddress {
             println(s"Obtained a public IP address ${string.trim}")
             promise.success(string.trim)
           case Left(value) =>
-            promise.failure(new UnsupportedOperationException(value))
+            println(s"Unable to obtain a public IP address: error ${r.code}")
+            promise.success("")
         }
       case Failure(ex) =>
-        promise.failure(ex)
+        // when failed, provide some dummy fallback
+        println(s"Unable to obtain a public IP address, $ex")
+        promise.success("")
     }
     promise.future
   }

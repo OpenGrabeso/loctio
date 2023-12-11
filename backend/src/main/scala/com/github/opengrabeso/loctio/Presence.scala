@@ -133,7 +133,8 @@ object Presence extends ZonedDateTimeCodecs {
           // when one client has reported going offline, there still may be other clients running
           val state = if (age < 70 && d.state == "offline") "online" else d.state
           //println(s"Report $login as $d")
-          login -> LocationInfo(Locations.locationFromIpAddress(d.ipAddress), lastSeen, state, Relation.Allowed, watchedBy)
+          val location = if (d.ipAddress.nonEmpty) Locations.locationFromIpAddress(d.ipAddress) else ""
+          login -> LocationInfo(location, lastSeen, state, Relation.Allowed, watchedBy)
         }.getOrElse(login -> LocationInfo("", now, "unknown", Relation.Allowed, watchedBy))
       }
     if (requests) {
