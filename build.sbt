@@ -9,8 +9,8 @@ lazy val resolverSettings = Seq(
 
 lazy val commonSettings = Seq(
   organization := "com.github.opengrabeso",
-  version := "0.5.0",
-  scalaVersion := "2.13.10",
+  version := "0.6.0",
+  scalaVersion := "2.13.12",
   scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature"),
   javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
 ) ++ resolverSettings
@@ -25,7 +25,7 @@ lazy val flyingSaucersSettings = Seq(
   libraryDependencies += "org.xhtmlrenderer" % "flying-saucer-core" % "9.1.20-opengrabeso.4"
 )
 
-val udashVersion = "0.9.0"
+val udashVersion = "0.10.0"
 
 val bootstrapVersion = "4.3.1"
 
