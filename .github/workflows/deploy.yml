@@ -26,12 +26,6 @@ jobs:
         run: |
           printf "${{ secrets.GCP_SA_KEY }}" > backend/src/main/resources/sa.json
 
-      - name: Assembly
-        run: |
-          printf "realm=github\nhost=www.github.com\nuser=${{ vars.ORG_USERNAME }}\password=${{ secrets.ORG_TOKEN }}" > ~/gihub.credentials
-          printf "[github]\n  actor=${{ vars.ORG_USERNAME }}\n  token=${{ secrets.ORG_TOKEN }}" > ~/.gitconfig
-          sbt backend/Docker/publishLocal
-
       - name: Auth GCloud
         id: auth
         uses: 'google-github-actions/auth@v1'
@@ -40,6 +34,13 @@ jobs:
           credentials_json: '${{ secrets.GCP_SA_KEY }}'
       - name: Setup GCloud
         uses: google-github-actions/setup-gcloud@v2
+
+      - name: Assembly
+        run: |
+          printf "realm=github\nhost=www.github.com\nuser=${{ vars.ORG_USERNAME }}\password=${{ secrets.ORG_TOKEN }}" > ~/gihub.credentials
+          printf "[github]\n  actor=${{ vars.ORG_USERNAME }}\n  token=${{ secrets.ORG_TOKEN }}" > ~/.gitconfig
+          sbt backend/Docker/publishLocal
+
       - name: Deploy to GCloud
         env:
           BRANCH_NAME: ${{ github.ref_name }}
@@ -50,7 +51,7 @@ jobs:
           gcloud config set core/project loctio
           gcloud config set run/region europe-west1
           
-          docker tag ${SERVICE}:0.5.0 ${IMAGE}:${BRANCH_NAME}
+          docker tag ${SERVICE}:0.6.1 ${IMAGE}:${BRANCH_NAME}
           docker push ${IMAGE}:${BRANCH_NAME}
           gcloud run deploy ${SERVICE} --image ${IMAGE}:${BRANCH_NAME}
           gcloud run services update-traffic ${SERVICE} --to-latest
