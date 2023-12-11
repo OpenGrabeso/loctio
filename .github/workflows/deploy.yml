@@ -5,7 +5,10 @@ on:
     branches:
       - master
       - docker
-
+permissions:
+  id-token: write # This is required for requesting the JWT (GCloud auth)
+  contents: read  # This is required for actions/checkout
+  packages: read
 jobs:
   deploy:
     name: Deploy using GCloud
