@@ -31,6 +31,7 @@ jobs:
         uses: 'google-github-actions/auth@v1'
         with:
           workload_identity_provider: projects/709603219086/locations/global/workloadIdentityPools/github/providers/github
+          service_account: ${{ secrets.SERVICE_ACCOUNT }}
       - name: Setup GCloud
         uses: google-github-actions/setup-gcloud@v2
 
