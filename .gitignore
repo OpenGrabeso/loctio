@@ -27,3 +27,4 @@ target
 secret.txt
 
 loctio-*.json
+/.bsp/
