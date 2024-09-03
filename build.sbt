@@ -168,15 +168,14 @@ lazy val backend = (project in file("backend"))
     libraryDependencies ++= commonLibs ++ jvmLibs ++ Seq(
       "com.google.http-client" % "google-http-client-appengine" % "1.44.2",
       "com.google.http-client" % "google-http-client-jackson2" % "1.44.2",
-      "com.google.apis" % "google-api-services-storage" % "v1-rev20240625-2.0.0",
 
       "com.softwaremill.sttp.client3" %% "okhttp-backend" % "3.9.7",
 
       "org.eclipse.jetty" % "jetty-server" % "9.4.55.v20240627",
       "org.eclipse.jetty" % "jetty-servlet" % "9.4.55.v20240627",
 
-      "com.google.cloud" % "google-cloud-storage" % "1.118.0",
-      "com.google.cloud" % "google-cloud-tasks" % "1.33.2",
+      "com.google.cloud" % "google-cloud-storage" % "2.40.1",
+      "com.google.cloud" % "google-cloud-tasks" % "2.46.0",
 
       "com.fasterxml.jackson.core" % "jackson-core" % jacksonVersion,
       "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion,
