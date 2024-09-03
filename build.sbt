@@ -25,9 +25,9 @@ lazy val flyingSaucersSettings = Seq(
   libraryDependencies += "org.xhtmlrenderer" % "flying-saucer-core" % "9.1.20-opengrabeso.4"
 )
 
-val udashVersion = "0.10.0"
+val udashVersion = "0.13.0"
 
-val bootstrapVersion = "4.3.1"
+val bootstrapVersion = "5.3.3"
 
 val udashJQueryVersion = "3.0.4"
 
@@ -43,7 +43,7 @@ lazy val jvmLibs = Seq(
 
 lazy val jsLibs = libraryDependencies ++= Seq(
   "org.scalatest" %%% "scalatest" % "3.2.19" % "test",
-  "org.scala-js" %%% "scalajs-dom" % "2.4.0",
+  "org.scala-js" %%% "scalajs-dom" % "2.8.0",
   "org.querki" %%% "jquery-facade" % "2.1",
 
   "io.udash" %%% "udash-core" % udashVersion,
@@ -102,13 +102,11 @@ lazy val trayUtil = (project in file("tray-util"))
     name := "LoctioStart",
     commonSettings,
     flyingSaucersSettings,
-    libraryDependencies += "com.typesafe.akka" %% "akka-http" % "10.5.0",
     libraryDependencies += "com.typesafe.akka" %% "akka-actor-typed" % "2.7.0",
-    libraryDependencies += "com.typesafe.akka" %% "akka-stream" % "2.7.0",
-    libraryDependencies += "com.softwaremill.sttp.client3" %% "okhttp-backend" % "3.8.14",
-    libraryDependencies += "com.twelvemonkeys.imageio" % "imageio-bmp" % "3.5",
-    libraryDependencies += "org.scala-lang.modules" %% "scala-swing" % "2.1.1",
-    libraryDependencies += "net.java.dev.jna" % "jna" % "5.5.0",
+    libraryDependencies += "com.softwaremill.sttp.client3" %% "okhttp-backend" % "3.9.7",
+    libraryDependencies += "com.twelvemonkeys.imageio" % "imageio-bmp" % "3.10.1",
+    libraryDependencies += "org.scala-lang.modules" %% "scala-swing" % "3.0.0",
+    libraryDependencies += "net.java.dev.jna" % "jna" % "5.14.0",
     libraryDependencies ++= commonLibs ++ jvmLibs,
     assembly / assemblyJarName := "loctio-tray.jar",
     assembly / assemblyMergeStrategy := {
