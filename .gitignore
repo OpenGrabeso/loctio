@@ -24,7 +24,6 @@ target
 
 /project/project/
 
-/backend/src/main/resources/secret.txt
+secret.txt
 
-/backend/src/main/resources/mixtio-*.json
-/backend/src/main/resources/sa.json
+loctio-*.json
