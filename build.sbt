@@ -102,7 +102,6 @@ lazy val trayUtil = (project in file("tray-util"))
     name := "LoctioStart",
     commonSettings,
     flyingSaucersSettings,
-    libraryDependencies += "com.typesafe.akka" %% "akka-actor-typed" % "2.7.0",
     libraryDependencies += "com.softwaremill.sttp.client3" %% "okhttp-backend" % "3.9.7",
     libraryDependencies += "com.twelvemonkeys.imageio" % "imageio-bmp" % "3.10.1",
     libraryDependencies += "org.scala-lang.modules" %% "scala-swing" % "3.0.0",

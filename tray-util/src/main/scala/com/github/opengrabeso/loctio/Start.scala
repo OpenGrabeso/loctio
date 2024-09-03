@@ -1,25 +1,23 @@
 package com.github.opengrabeso.loctio
 
-import java.awt.{AWTException, Desktop}
+import java.awt.{Desktop, AWTException}
 import java.net.URL
 import java.time.{ZoneId, ZonedDateTime}
 import java.time.format._
-import java.util.Locale
-
-import akka.actor.{ActorSystem, Cancellable}
+import java.util.{Locale, Timer, TimerTask}
 import com.github.opengrabeso.loctio.common.PublicIpAddress
 import com.github.opengrabeso.github.model.Notification
 import com.github.opengrabeso.github.rest.AuthorizedAPI
 import com.github.opengrabeso.github.{RestAPIClient => GitHubAPIClient}
+
 import javax.swing.SwingUtilities
 import javax.imageio.ImageIO
-import java.awt.{Image, SystemTray, TrayIcon}
-
+import java.awt.{TrayIcon, SystemTray, Image}
 import io.udash.rest.SttpRestClient
 import rest.{RestAPI, RestAPIClient}
 
 import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Future, Promise, duration}
+import scala.concurrent.{duration, Await, ExecutionContext, Future, Promise}
 import scala.swing._
 import scala.swing.Swing._
 import common.ChainingSyntax._
@@ -31,15 +29,39 @@ import scala.swing.event.MouseClicked
 
 object Start extends SimpleSwingApplication {
 
-  implicit val system: ActorSystem = ActorSystem()
+  type Task = TimerTask
 
-  val exitEvent = Promise[Boolean]()
+  object scheduler {
+    private val timer = new Timer()
+
+    def scheduleOnce(delay: Duration)(task: => Unit)(implicit ec: ExecutionContext): TimerTask = {
+      val timerTask = new TimerTask {
+        override def run(): Unit = {
+          ec.future(task)
+        }
+      }
+      timer.schedule(timerTask, delay.toMillis)
+      timerTask
+    }
+
+    def scheduleAtFixedRate(initialDelay: Duration, period: Duration)(task: () => Unit)(implicit ec: ExecutionContext): TimerTask = {
+      val timerTask = new TimerTask {
+        override def run(): Unit = {
+          ec.future {
+            task()
+          }
+        }
+      }
+      timer.scheduleAtFixedRate(timerTask, initialDelay.toMillis, period.toMillis)
+      timerTask
+    }
+  }
 
   private var cfg = Config.empty
   private var loginName = ""
   private var usersReady = false
-  private var updateSchedule: Cancellable = _
-  private var notificationsSchedule: Cancellable = _
+  private var updateSchedule: Task = _
+  private var notificationsSchedule: Task = _
   private var serverUrl: String = _
 
   var lastNotifications =  Option.empty[String]
@@ -91,7 +113,7 @@ object Start extends SimpleSwingApplication {
       tryLocalServer(ServerLocal8080)
     }
 
-    system.scheduler.scheduleOnce(Duration(2000, duration.MILLISECONDS)) {
+    scheduler.scheduleOnce(Duration(2000, duration.MILLISECONDS)) {
       serverFound.trySuccess(ServerProduction)
     }
 
@@ -134,7 +156,7 @@ object Start extends SimpleSwingApplication {
     cancelNotifications()
 
     def requestNextAfter(seconds: Int) = {
-      notificationsSchedule = system.scheduler.scheduleOnce(Duration(seconds, duration.SECONDS)){
+      notificationsSchedule = scheduler.scheduleOnce(Duration(seconds, duration.SECONDS)){
         requestNotifications(token)
       }(OnSwing)
     }
@@ -166,7 +188,7 @@ object Start extends SimpleSwingApplication {
         loginName = s
         println(s"Login as $role done $s for")
         // request users regularly
-        updateSchedule = system.scheduler.scheduleAtFixedRate(Duration(0, duration.MINUTES), Duration(1, duration.MINUTES)) {() =>
+        updateSchedule = scheduler.scheduleAtFixedRate(Duration(0, duration.MINUTES), Duration(1, duration.MINUTES)) {() =>
           requestUsers.at(OnSwing).foreach { case (users, tooltip) =>
             if (token == cfg.token) { // ignore any pending futures with a different token
               usersReady = true
