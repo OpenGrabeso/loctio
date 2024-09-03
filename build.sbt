@@ -9,8 +9,8 @@ lazy val resolverSettings = Seq(
 
 lazy val commonSettings = Seq(
   organization := "com.github.opengrabeso",
-  version := "0.6.0",
-  scalaVersion := "2.13.12",
+  version := "0.7.0",
+  scalaVersion := "2.13.14",
   scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature"),
   javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
 ) ++ resolverSettings
@@ -33,7 +33,7 @@ val udashJQueryVersion = "3.0.4"
 
 // TODO: try to share
 lazy val jvmLibs = Seq(
-  "org.scalatest" %% "scalatest" % "3.2.9" % "test",
+  "org.scalatest" %% "scalatest" % "3.2.19" % "test",
 
   "io.udash" %% "udash-core" % udashVersion,
   "io.udash" %% "udash-rest" % udashVersion,
@@ -42,7 +42,7 @@ lazy val jvmLibs = Seq(
 )
 
 lazy val jsLibs = libraryDependencies ++= Seq(
-  "org.scalatest" %%% "scalatest" % "3.2.9" % "test",
+  "org.scalatest" %%% "scalatest" % "3.2.19" % "test",
   "org.scala-js" %%% "scalajs-dom" % "2.4.0",
   "org.querki" %%% "jquery-facade" % "2.1",
 
@@ -166,14 +166,14 @@ lazy val backend = (project in file("backend"))
     flyingSaucersSettings,
 
     libraryDependencies ++= commonLibs ++ jvmLibs ++ Seq(
-      "com.google.http-client" % "google-http-client-appengine" % "1.39.0",
-      "com.google.http-client" % "google-http-client-jackson2" % "1.39.0",
-      "com.google.apis" % "google-api-services-storage" % "v1-rev171-1.25.0",
+      "com.google.http-client" % "google-http-client-appengine" % "1.44.2",
+      "com.google.http-client" % "google-http-client-jackson2" % "1.44.2",
+      "com.google.apis" % "google-api-services-storage" % "v1-rev20240625-2.0.0",
 
-      "com.softwaremill.sttp.client3" %% "okhttp-backend" % "3.8.14",
+      "com.softwaremill.sttp.client3" %% "okhttp-backend" % "3.9.7",
 
-      "org.eclipse.jetty" % "jetty-server" % "9.4.31.v20200723",
-      "org.eclipse.jetty" % "jetty-servlet" % "9.4.31.v20200723",
+      "org.eclipse.jetty" % "jetty-server" % "9.4.55.v20240627",
+      "org.eclipse.jetty" % "jetty-servlet" % "9.4.55.v20240627",
 
       "com.google.cloud" % "google-cloud-storage" % "1.118.0",
       "com.google.cloud" % "google-cloud-tasks" % "1.33.2",
@@ -182,13 +182,13 @@ lazy val backend = (project in file("backend"))
       "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion,
 
       "com.fasterxml" % "aalto-xml" % "1.0.0",
-      "org.jsoup" % "jsoup" % "1.13.1",
+      "org.jsoup" % "jsoup" % "1.18.1",
 
       //"org.webjars" % "webjars-locator-core" % "0.39",
 
-      "org.slf4j" % "slf4j-simple" % "1.6.1",
-      "org.apache.commons" % "commons-math" % "2.1",
-      "commons-io" % "commons-io" % "2.1"
+      "org.slf4j" % "slf4j-simple" % "1.7.36",
+      "org.apache.commons" % "commons-math" % "2.2",
+      "commons-io" % "commons-io" % "2.16.1"
     ),
 
     excludeDependencies ++= Seq(
