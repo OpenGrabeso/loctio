@@ -9,7 +9,7 @@ The application tracks presence / location for the users connecting to it based 
 Users are identified by providing GitHub access token. For this purpose a token with no scopes is enough. If you
 want to use notifications (see below), scopes `notifications` and `repo` should be present on the token. 
 
-Tray utility can be downloaded from [releases](https://github.com/OpenGrabeso/loctio/releases). Tray launcher exe is at [release tray-256MB](https://github.com/gamatron/im/releases/tag/tray-256MB)
+Tray utility can be downloaded from [releases](https://github.com/OpenGrabeso/loctio/releases).
 
 Notifications
 -------------
